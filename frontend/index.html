@@ -39,6 +39,50 @@
         </article>
       </section>
 
+      <section class="panel data-status" aria-label="Retail data status">
+        <h2 class="panel-title">Retail Data Layer</h2>
+        <div class="data-status-grid">
+          <article class="kpi-card">
+            <h3>Stores</h3>
+            <p class="kpi-value" id="data-stores">&mdash;</p>
+          </article>
+          <article class="kpi-card">
+            <h3>Products</h3>
+            <p class="kpi-value" id="data-products">&mdash;</p>
+          </article>
+          <article class="kpi-card">
+            <h3>Sales Records</h3>
+            <p class="kpi-value" id="data-sales">&mdash;</p>
+          </article>
+          <article class="kpi-card">
+            <h3>Inventory Records</h3>
+            <p class="kpi-value" id="data-inventory">&mdash;</p>
+          </article>
+        </div>
+        <p class="placeholder-body" id="data-range">
+          Loading sales history&hellip;
+        </p>
+        <div class="data-preview">
+          <h3>Recent Sales Preview</h3>
+          <table class="preview-table">
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Store</th>
+                <th>Product</th>
+                <th>Qty</th>
+                <th>Revenue</th>
+              </tr>
+            </thead>
+            <tbody id="sales-preview">
+              <tr>
+                <td colspan="5" class="placeholder-body">Loading&hellip;</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="main-grid">
         <div class="panel dashboard-panel">
           <h2 class="panel-title">Sales &amp; Inventory Dashboard</h2>

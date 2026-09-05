@@ -134,6 +134,42 @@ body {
   min-height: 140px;
 }
 
+.data-status-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.data-preview {
+  margin-top: 1rem;
+}
+
+.data-preview h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+}
+
+.preview-table th,
+.preview-table td {
+  text-align: left;
+  padding: 0.5rem 0.6rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.preview-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 .app-footer {
   text-align: center;
   padding: 1rem 1.5rem;
