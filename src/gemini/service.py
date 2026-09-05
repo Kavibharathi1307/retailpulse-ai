@@ -17,7 +17,7 @@ from src.gemini.errors import (
     GeminiTimeoutError,
 )
 from src.gemini.evidence import build_evidence
-from src.gemini.intents import INTENT_UNSUPPORTED, classify_intent
+from src.gemini.intents import INTENT_FORECAST, INTENT_UNSUPPORTED, classify_intent
 from src.gemini.prompts import SYSTEM_INSTRUCTION, build_user_prompt
 
 MAX_QUESTION_LENGTH = 500
@@ -78,12 +78,16 @@ class CopilotService:
         assumptions = self._assumptions(analysis_date)
 
         if not evidence:
-            return {
-                "question": question,
-                "answer": (
+            if intent == INTENT_FORECAST:
+                answer_text = "Insufficient historical data for a reliable forecast."
+            else:
+                answer_text = (
                     "The available sales and inventory data cannot determine the "
                     "answer to that question."
-                ),
+                )
+            return {
+                "question": question,
+                "answer": answer_text,
                 "intent": intent,
                 "analysis_date": analysis_date,
                 "data_status": data_status,
@@ -194,6 +198,17 @@ class CopilotService:
             lines.append(f"  Sales anomalies selected: {len(evidence)} record(s).")
         elif intent in ("product_performance", "store_performance"):
             lines.append(f"  Performance records selected: {len(evidence)}.")
+        elif intent == "forecast":
+            summary = next((e for e in evidence if e.get("type") == "FORECAST_SUMMARY"), None)
+            if summary and summary.get("value"):
+                value = summary["value"]
+                horizon = summary.get("horizon_days")
+                lines.append(
+                    f"  Demand outlook: {value.get('rising_demand', 0)} rising, "
+                    f"{value.get('falling_demand', 0)} falling demand; "
+                    f"{value.get('inventory_at_risk', 0)} item(s) may not cover "
+                    f"expected {horizon}-day demand."
+                )
         elif intent == "attention":
             counts = next((e for e in evidence if e.get("type") == "ATTENTION_SUMMARY"), None)
             if counts and counts.get("value"):
@@ -225,6 +240,8 @@ class CopilotService:
             "phrases the answer from the supplied evidence.",
             "Stock-out dates are deterministic estimates based on the 28-day average "
             "daily sales rate, not guarantees.",
+            "Demand forecasts are deterministic estimates based on recent demand "
+            "history and are not guarantees of future sales.",
             "Profitability cannot be assessed because cost/margin data is unavailable.",
             "Evidence is limited to the most relevant records.",
         ]

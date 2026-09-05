@@ -982,6 +982,95 @@ body {
   display: inline-block;
 }
 
+/* --- Demand outlook (Milestone 7) -------------------------------------------- */
+
+.section-head-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.outlook-section {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.outlook-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.outlook-stat {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.outlook-stat strong {
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: -0.3px;
+}
+
+.outlook-stat span {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.outlook-stat-up strong {
+  color: var(--ok);
+}
+
+.outlook-stat-down strong,
+.outlook-stat-risk strong {
+  color: var(--risk);
+}
+
+.outlook-stat-watch strong,
+.outlook-stat-thin strong {
+  color: var(--slow);
+}
+
+.panel-context {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.chart-line-forecast {
+  stroke: var(--slow);
+  stroke-width: 2.5;
+  stroke-dasharray: 7 5;
+  stroke-linecap: round;
+}
+
+.chart-divider {
+  stroke: #cbd5e1;
+  stroke-width: 1;
+  stroke-dasharray: 3 4;
+}
+
+.chart-divider-label {
+  fill: var(--faint);
+  font-size: 10px;
+  font-family: var(--font);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+}
+
+.chart-forecast-dot {
+  fill: var(--slow);
+  stroke: #fff;
+  stroke-width: 2;
+}
+
 /* --- Attention -------------------------------------------------------------- */
 
 .count-badge {

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Optional
 
 from src.analytics import anomalies, attention, data, performance, stock, velocity
+from src.analytics import forecast as forecast_module
 from src.analytics.config import AnalyticsConfig, DEFAULT_CONFIG
 from src.analytics.metrics import days_between, window_end
 
@@ -218,4 +219,86 @@ def attention_summary(
         "analysis_date": analysis_date.isoformat(),
         "counts": attention.summarize(items),
         "items": items,
+    }
+
+
+def _forecast_context(
+    db_path: Path, as_of_date: Optional[date], config: AnalyticsConfig
+) -> tuple[date, date]:
+    analysis_date = data.resolve_analysis_date(as_of_date, db_path)
+    bounds = data.dataset_date_range(db_path)
+    if bounds is None:
+        raise ValueError("no sales history to forecast from")
+    return bounds[0], analysis_date
+
+
+def forecast(
+    db_path: Path = data.DATABASE_PATH,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
+    horizon_days: int = 7,
+    config: AnalyticsConfig = DEFAULT_CONFIG,
+) -> dict:
+    """Short-horizon demand forecast + inventory outlook per store/product."""
+    history_start, analysis_date = _forecast_context(db_path, as_of_date, config)
+    inventory = data.load_inventory(db_path, store_id=store_id, product_id=product_id)
+    baseline_end = analysis_date - timedelta(days=config.forecast_recent_days)
+    baseline_start = baseline_end - timedelta(days=config.forecast_baseline_days - 1)
+    sales_by_day = data.load_sales_by_day(
+        db_path,
+        start=baseline_start,
+        end=analysis_date,
+        store_id=store_id,
+        product_id=product_id,
+    )
+    items = forecast_module.forecast_rows(
+        inventory, sales_by_day, analysis_date,
+        horizon_days, history_start, config,
+    )
+    return {
+        "analysis_date": analysis_date.isoformat(),
+        "horizon_days": horizon_days,
+        "history_start": history_start.isoformat(),
+        "history_end": analysis_date.isoformat(),
+        "method": (
+            "carry the recent daily demand rate over the horizon days after "
+            "the analysis date; baseline window used only for trend"
+        ),
+        "counts": forecast_module.summarize(items),
+        "forecast_status": forecast_module.aggregate_status(items),
+        "items": items,
+    }
+
+
+def forecast_summary(
+    db_path: Path = data.DATABASE_PATH,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
+    horizon_days: int = 7,
+    config: AnalyticsConfig = DEFAULT_CONFIG,
+) -> dict:
+    """Aggregate forecast outlook for the Demand Outlook dashboard section."""
+    history_start, analysis_date = _forecast_context(db_path, as_of_date, config)
+    result = forecast(
+        db_path=db_path,
+        store_id=store_id,
+        product_id=product_id,
+        as_of_date=analysis_date,
+        horizon_days=horizon_days,
+        config=config,
+    )
+    outlook = forecast_module.outlook_summary(result["items"], horizon_days)
+    return {
+        "analysis_date": result["analysis_date"],
+        "horizon_days": horizon_days,
+        "history_start": history_start.isoformat(),
+        "history_end": result["history_end"],
+        "method": result["method"],
+        "forecast_status": outlook["forecast_status"],
+        "counts": outlook["counts"],
+        "expected_daily_demand": outlook["expected_daily_demand"],
+        "expected_horizon_units": outlook["expected_horizon_units"],
+        "forecastable_total": outlook["forecastable_total"],
     }

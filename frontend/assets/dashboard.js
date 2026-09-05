@@ -29,6 +29,7 @@ function trendBadge(value) {
     UP: ["Up", "trend-ok"],
     DOWN: ["Down", "trend-danger"],
     STABLE: ["Stable", "trend-neutral"],
+    UNKNOWN: ["Unknown", "trend-neutral"],
   }[String(value == null ? "" : value).toUpperCase()];
   if (!config) {
     return pillElement(String(value == null ? "" : value), "trend-neutral");
@@ -687,6 +688,143 @@ function wireAttentionControls() {
   });
 }
 
+// --- Demand outlook (Milestone 7) ------------------------------------------
+
+let forecastHorizon = 7;
+let lastSeriesItems = [];
+
+function inventoryOutlookBadge(value) {
+  const label = {
+    AT_RISK: "At risk",
+    WATCH: "Watch",
+    SUFFICIENT: "Sufficient",
+    INSUFFICIENT_DATA: "Insufficient data",
+  }[value] || String(value == null ? "" : value);
+  const cls = {
+    AT_RISK: "risk-critical",
+    WATCH: "risk-medium",
+    SUFFICIENT: "risk-ok",
+    INSUFFICIENT_DATA: "trend-neutral",
+  }[value] || "trend-neutral";
+  return pillElement(label, cls);
+}
+
+function renderOutlookStats(summary) {
+  const ids = ["outlook-rising", "outlook-falling", "outlook-at-risk", "outlook-watch", "outlook-thin"];
+  const counts = summary && summary.counts ? summary.counts : null;
+  if (counts) {
+    const byTrend = counts.by_trend || {};
+    const byOutlook = counts.by_inventory_outlook || {};
+    const byStatus = counts.by_forecast_status || {};
+    const values = [
+      byTrend.UP || 0,
+      byTrend.DOWN || 0,
+      byOutlook.AT_RISK || 0,
+      byOutlook.WATCH || 0,
+      byStatus.INSUFFICIENT_DATA || 0,
+    ];
+    ids.forEach((id, index) => {
+      document.getElementById(id).textContent = formatNumber(values[index]);
+    });
+  } else {
+    ids.forEach((id) => {
+      document.getElementById(id).textContent = "\u2014";
+    });
+  }
+
+  const note = document.getElementById("outlook-note");
+  if (summary && summary.analysis_date) {
+    note.textContent =
+      `Deterministic demand outlook as of ${formatDateLabel(summary.analysis_date)} \u00b7 ` +
+      `${summary.method || "recent-demand rate over the forecast horizon"}.`;
+  } else {
+    note.textContent = "Demand outlook unavailable.";
+  }
+
+  const context = document.getElementById("outlook-chart-context");
+  if (summary && summary.expected_horizon_units != null && summary.horizon_days) {
+    context.textContent =
+      `Expected ~${formatNumber(summary.expected_horizon_units)} units over ${summary.horizon_days} days`;
+  } else {
+    context.textContent = "";
+  }
+
+  document.getElementById("outlook-count").textContent =
+    counts && counts.total != null ? formatNumber(counts.total) : "0";
+}
+
+function renderOutlookTable(items) {
+  const tbody = document.getElementById("outlook-tbody");
+  const foot = document.getElementById("outlook-foot");
+  clearNode(tbody);
+
+  if (!Array.isArray(items) || items.length === 0) {
+    const tr = document.createElement("tr");
+    const td = document.createElement("td");
+    td.colSpan = 7;
+    td.className = "state-note";
+    td.textContent = "No demand outlook available for the current dataset.";
+    tr.appendChild(td);
+    tbody.appendChild(tr);
+    foot.textContent = "";
+    return;
+  }
+
+  const MAX_OUTLOOK_VISIBLE = 20;
+  const visible = items.slice(0, MAX_OUTLOOK_VISIBLE);
+  for (const row of visible) {
+    const tr = document.createElement("tr");
+    tr.appendChild(Object.assign(document.createElement("td"), { textContent: row.product_name, className: "cell-strong" }));
+    tr.appendChild(Object.assign(document.createElement("td"), { textContent: row.store_name }));
+    tr.appendChild(Object.assign(document.createElement("td"), { textContent: formatNumber(row.current_stock) }));
+    tr.appendChild(Object.assign(document.createElement("td"), {
+      textContent: row.recent_daily_demand == null ? "\u2014" : formatNumber(row.recent_daily_demand),
+    }));
+    tr.appendChild(Object.assign(document.createElement("td"), {
+      textContent: row.forecast_units == null ? "\u2014" : formatNumber(row.forecast_units),
+    }));
+    const trendCell = document.createElement("td");
+    trendCell.appendChild(trendBadge(row.trend));
+    tr.appendChild(trendCell);
+    const outlookCell = document.createElement("td");
+    outlookCell.appendChild(inventoryOutlookBadge(row.inventory_outlook));
+    tr.appendChild(outlookCell);
+    tbody.appendChild(tr);
+  }
+
+  foot.textContent =
+    items.length > MAX_OUTLOOK_VISIBLE
+      ? `Showing ${MAX_OUTLOOK_VISIBLE} of ${formatNumber(items.length)} demand outlook records.`
+      : "";
+}
+
+async function loadOutlook(seriesItems) {
+  lastSeriesItems = Array.isArray(seriesItems) ? seriesItems : [];
+  const horizon = forecastHorizon;
+  const [summary, forecast] = await Promise.all([
+    prefer(`/api/analytics/forecast-summary?horizon_days=${horizon}`),
+    prefer(`/api/analytics/forecast?horizon_days=${horizon}&limit=50`),
+  ]);
+  renderOutlookStats(summary);
+  renderOutlookTable(forecast && Array.isArray(forecast.items) ? forecast.items : []);
+  setOutlookData(lastSeriesItems.slice(-28), summary || {});
+}
+
+function wireOutlookControls() {
+  document.querySelectorAll(".outlook-section .segmented").forEach((group) => {
+    group.addEventListener("click", (event) => {
+      const button = event.target.closest(".seg-btn");
+      if (!button) {
+        return;
+      }
+      group.querySelectorAll(".seg-btn").forEach((b) => b.classList.remove("is-active"));
+      button.classList.add("is-active");
+      forecastHorizon = Number(button.dataset.horizon) || 7;
+      loadOutlook(lastSeriesItems);
+    });
+  });
+}
+
 // --- Boot -----------------------------------------------------------------
 
 function renderDatasetStrip(summary, attention, series) {
@@ -740,6 +878,7 @@ async function bootDashboard() {
   renderProducts(products, inventory, stockout);
   renderRecommendations(recommendations);
   renderDatasetStrip(summary, attention, series);
+  loadOutlook(seriesItems);
 
   setSalesSeries(seriesItems.length > 0 ? seriesItems : []);
 

@@ -59,6 +59,32 @@ class AnalyticsConfig:
     min_baseline_units: float = 30.0
     min_anomaly_change_units: float = 10.0
 
+    # --- demand forecast ---------------------------------------------------
+    # Short-term demand outlook (explainable, Milestone 7). The recent window
+    # daily rate is assumed to continue over the forecast horizon:
+    #   forecast_units = recent_daily_rate * horizon_days
+    # The preceding baseline window only positions the trend; it never changes
+    # the forecast numbers.
+    forecast_recent_days: int = 7
+    forecast_baseline_days: int = 28
+    # A forecast needs a fully covered recent window; below it is
+    # INSUFFICIENT_DATA (no numbers are fabricated).
+    forecast_min_recent_days: int = 7
+    # The baseline window may be partial: at least this many covered days keeps
+    # the trend meaningful (SUFFICIENT_DATA); a thinner but non-zero baseline is
+    # reported as LIMITED_DATA.
+    forecast_min_baseline_days: int = 14
+    # |recent - baseline| daily rate change at or above this % => UP/DOWN;
+    # smaller movements are STABLE (tiny fluctuations are noise).
+    forecast_trend_threshold_pct: float = 15.0
+    # Inventory vs expected demand buffer: current_stock >= forecast_units *
+    # (1 + buffer/100) => SUFFICIENT; below forecast_units => AT_RISK; in
+    # between => WATCH.
+    forecast_inventory_buffer_pct: float = 25.0
+    # Horizons (days) accepted by the API. Any other horizon is rejected with
+    # HTTP 400. The engine itself accepts any positive horizon.
+    forecast_valid_horizons: tuple = (7, 14, 30)
+
     # --- trend -------------------------------------------------------------
     # Trend direction within a period uses the first vs second half of the
     # period average daily rate. |difference| below this % => STABLE.

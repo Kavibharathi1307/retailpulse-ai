@@ -35,6 +35,8 @@ VALID_RECOMMENDATION_TYPES = {
     "MONITOR_DEMAND",
 }
 
+VALID_FORECAST_HORIZONS = DEFAULT_CONFIG.forecast_valid_horizons
+
 
 def _bounded_limit(limit: int) -> int:
     if limit < 0 or limit > MAX_LIMIT:
@@ -404,3 +406,80 @@ def recommendations(
         "counts": result["counts"],
         **_page(items, limit, offset),
     }
+
+
+def _validate_horizon(horizon_days: Optional[int]) -> int:
+    if horizon_days is None:
+        return 7
+    if horizon_days not in VALID_FORECAST_HORIZONS:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_horizon_days",
+                "message": (
+                    "horizon_days must be one of "
+                    + ", ".join(str(h) for h in sorted(VALID_FORECAST_HORIZONS))
+                ),
+            },
+        )
+    return horizon_days
+
+
+@router.get("/forecast")
+def forecast(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    horizon_days: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    """Deterministic short-horizon demand forecast per store/product."""
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    horizon_days = _validate_horizon(horizon_days)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    result = _run(
+        lambda: analytics_engine.forecast(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            horizon_days=horizon_days,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "horizon_days": result["horizon_days"],
+        "history_start": result["history_start"],
+        "history_end": result["history_end"],
+        "method": result["method"],
+        "forecast_status": result["forecast_status"],
+        "counts": result["counts"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/forecast-summary")
+def forecast_summary(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    horizon_days: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+) -> dict:
+    """Aggregate demand outlook used by the dashboard's Demand Outlook section."""
+    horizon_days = _validate_horizon(horizon_days)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    return _run(
+        lambda: analytics_engine.forecast_summary(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            horizon_days=horizon_days,
+            config=DEFAULT_CONFIG,
+        )
+    )

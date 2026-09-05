@@ -149,6 +149,51 @@ def main() -> int:
           and custom["analysis_date"] == "2026-01-15"
           and custom["period_end"] == "2026-01-15")
 
+    # --- demand forecast (Milestone 7) --------------------------------------
+    status, forecast = get("/api/analytics/forecast?limit=50")
+    check("GET /api/analytics/forecast works", status == 200 and forecast["total"] == 180)
+    check("forecast defaults to a 7-day horizon", forecast["horizon_days"] == 7)
+    check("forecast reports the analysis date",
+          forecast["analysis_date"] == "2026-01-31")
+    check("forecast marks all rows SUFFICIENT_DATA",
+          forecast["forecast_status"] == "SUFFICIENT_DATA"
+          and forecast["counts"]["by_forecast_status"]["SUFFICIENT_DATA"] == 180)
+    check("forecast items expose demand/trend/outlook",
+          all("recent_daily_demand" in row and "forecast_units" in row
+              and "trend" in row and "inventory_outlook" in row for row in forecast["items"]))
+    check("forecast items carry the requested horizon",
+          all(row["horizon_days"] == 7 for row in forecast["items"]))
+    check("forecast produces expected units for some rows",
+          any(row["forecast_units"] > 0 for row in forecast["items"]))
+
+    status, fer = get("/api/analytics/forecast-summary")
+    check("GET /api/analytics/forecast-summary works",
+          status == 200 and fer["horizon_days"] == 7)
+    check("forecast summary expected figures are sane",
+          fer["expected_daily_demand"] > 0
+          and fer["expected_horizon_units"] >= fer["expected_daily_demand"])
+
+    status, f30 = get("/api/analytics/forecast?horizon_days=30&limit=10")
+    check("forecast accepts a 30-day horizon",
+          status == 200 and f30["horizon_days"] == 30 and f30["total"] == 180)
+    status, f14 = get("/api/analytics/forecast?horizon_days=14&limit=10")
+    check("forecast accepts a 14-day horizon",
+          status == 200 and f14["horizon_days"] == 14 and f14["total"] == 180)
+    status, fprod = get("/api/analytics/forecast?product_id=7&limit=5")
+    check("forecast filtered by product", status == 200 and fprod["total"] == 5
+          and all(row["product_id"] == 7 for row in fprod["items"]))
+    status, fstore = get("/api/analytics/forecast?store_id=1&limit=5")
+    check("forecast filtered by store", status == 200 and fstore["total"] == 36
+          and all(row["store_id"] == 1 for row in fstore["items"]))
+
+    status, early = get("/api/analytics/forecast?as_of_date=2025-11-04&limit=50")
+    check("early as_of_date forecast is INSUFFICIENT_DATA",
+          status == 200 and early["forecast_status"] == "INSUFFICIENT_DATA")
+
+    _, fd1 = get("/api/analytics/forecast?limit=50")
+    _, fd2 = get("/api/analytics/forecast?limit=50")
+    check("forecast responses are deterministic", fd1 == fd2)
+
     # --- determinism over HTTP ---------------------------------------------
     _, d1 = get("/api/analytics/stock-out-risks?limit=100")
     _, d2 = get("/api/analytics/stock-out-risks?limit=100")
@@ -165,6 +210,9 @@ def main() -> int:
     expect_status("/api/analytics/slow-movers?limit=-1", 400)
     expect_status("/api/analytics/slow-movers?limit=5000", 400)
     expect_status("/api/analytics/stock-out-risks?offset=-1", 400)
+    expect_status("/api/analytics/forecast?horizon_days=5", 400)
+    expect_status("/api/analytics/forecast?horizon_days=abc", 422)
+    expect_status("/api/analytics/forecast-summary?horizon_days=99", 400)
 
     # --- regression: Milestone 2 endpoints still work ----------------------
     status, summary = get("/api/data/summary")
@@ -180,6 +228,9 @@ def main() -> int:
     status, html = get_body("/")
     check("frontend includes analytics-status section", status == 200
           and 'id="analytics-stockout"' in html and 'id="analytics-range"' in html)
+    check("frontend includes demand outlook section", status == 200
+          and 'id="outlook-chart"' in html and 'id="outlook-tbody"' in html
+          and 'id="outlook-rising"' in html)
 
     server.should_exit = True
     thread.join(timeout=10)

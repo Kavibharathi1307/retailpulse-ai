@@ -30,6 +30,7 @@ from src.gemini.errors import (
 from src.gemini.intents import (
     INTENT_ATTENTION,
     INTENT_DROP,
+    INTENT_FORECAST,
     INTENT_OVERSTOCK,
     INTENT_PRODUCT,
     INTENT_REORDER,
@@ -119,6 +120,18 @@ class IntentRoutingTest(unittest.TestCase):
         self.assert_intent("tell me a joke", INTENT_UNSUPPORTED)
         self.assert_intent("hi", INTENT_UNSUPPORTED)
 
+    def test_forecast_demand_questions(self):
+        self.assert_intent("How much demand should I expect next week?", INTENT_FORECAST)
+        self.assert_intent("Which products have rising demand?", INTENT_FORECAST)
+        self.assert_intent("Which products are trending down?", INTENT_FORECAST)
+        self.assert_intent("Is current inventory enough for next week?", INTENT_FORECAST)
+        self.assert_intent("What is the demand forecast for the next 14 days?", INTENT_FORECAST)
+        self.assert_intent("which products have falling sales", INTENT_FORECAST)
+
+    def test_weather_forecast_still_off_topic(self):
+        self.assert_intent("What is the weather forecast?", INTENT_UNSUPPORTED)
+        self.assert_intent("forecast the stock market this week", INTENT_UNSUPPORTED)
+
 
 class ServiceWithGeminiTest(unittest.TestCase):
     def test_stockout_question_grounded(self):
@@ -207,6 +220,37 @@ class ServiceWithGeminiTest(unittest.TestCase):
         self.assertEqual(result["ai_status"], "SKIPPED")
         self.assertEqual(result["evidence"], [])
         self.assertIn("cannot determine", result["answer"])
+        self.assertEqual(fake.calls, [])
+
+    def test_forecast_question_grounded(self):
+        fake = FakeClient("Spring water demand is expected to stay strong.")
+        result = service_with(fake).answer("What demand should I expect next week?")
+        self.assertEqual(result["intent"], INTENT_FORECAST)
+        self.assertTrue(result["grounded"])
+        self.assertEqual(result["ai_status"], "AVAILABLE")
+        self.assertEqual(result["data_status"], "SUFFICIENT")
+        types = [e["type"] for e in result["evidence"]]
+        self.assertIn("FORECAST_SUMMARY", types)
+        self.assertIn("FORECAST", types)
+
+    def test_forecast_evidence_is_estimate_not_fact(self):
+        fake = FakeClient("ok")
+        result = service_with(fake).answer("What demand should I expect next week?")
+        forecast_records = [e for e in result["evidence"] if e["type"] == "FORECAST"]
+        self.assertTrue(forecast_records)
+        self.assertTrue(all(e["category"] == "ESTIMATE" for e in forecast_records))
+
+    def test_forecast_insufficient_data_message(self):
+        fake = FakeClient()
+        result = service_with(fake).answer(
+            "What demand should I expect for product 999 next week?"
+        )
+        self.assertEqual(result["intent"], INTENT_FORECAST)
+        self.assertEqual(result["data_status"], "INSUFFICIENT_DATA")
+        self.assertFalse(result["grounded"])
+        self.assertEqual(result["ai_status"], "SKIPPED")
+        self.assertEqual(result["evidence"], [])
+        self.assertIn("Insufficient historical data for a reliable forecast", result["answer"])
         self.assertEqual(fake.calls, [])
 
 

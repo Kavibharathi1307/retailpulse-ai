@@ -15,6 +15,7 @@ INTENT_SLOW_MOVERS = "slow_movers"
 INTENT_SPIKE = "spike"
 INTENT_DROP = "drop"
 INTENT_ANOMALY = "anomaly"
+INTENT_FORECAST = "forecast"
 INTENT_PRODUCT = "product_performance"
 INTENT_STORE = "store_performance"
 INTENT_ATTENTION = "attention"
@@ -25,11 +26,12 @@ MAX_STORE_ID = 1000
 
 # Phrases that are clearly outside the retail data domain. Detected first so a
 # question like "how is the stock market doing?" is never treated as retail.
+# Note: "weather forecast" stays off-topic via the "weather" marker; retail
+# demand-forecast questions are routed by the forecast intent below.
 OFF_TOPIC_MARKERS = (
     "recipe",
     "cook",
     "weather",
-    "forecast",
     "salary",
     "who is",
     "capital of",
@@ -58,6 +60,16 @@ _KEYWORD_RULES = [
     (INTENT_SLOW_MOVERS, (
         "slow moving", "slow-moving", "slow mover", "slowly", "not selling",
         "barely selling", "hardly selling", "low velocity", "dormant",
+    )),
+    (INTENT_FORECAST, (
+        "forecast", "demand outlook", "future demand", "expected demand",
+        "next week", "next 7 days", "next 14 days", "next 30 days",
+        "rising demand", "falling demand", "rising sales", "falling sales",
+        "increasing demand", "decreasing demand", "trending up", "trending down",
+        "demand trend", "trend up", "trend down", "how much demand",
+        "expect demand", "demand should i expect", "demand for next",
+        "inventory enough", "enough inventory", "enough for next",
+        "cover the demand", "cover demand", "will i run out",
     )),
     (INTENT_SPIKE, (
         "spike", "surge", "jumped", "shot up", "sold a lot", "went up",

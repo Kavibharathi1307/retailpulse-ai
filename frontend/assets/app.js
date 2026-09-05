@@ -5,11 +5,13 @@
 
 function boot() {
   initSalesChart(document.getElementById("sales-chart"));
+  initOutlookChart(document.getElementById("outlook-chart"));
   initCopilot();
   bootDashboard();
   wireTrendControls();
   wireProductControls();
   wireAttentionControls();
+  wireOutlookControls();
 }
 
 if (document.readyState === "loading") {

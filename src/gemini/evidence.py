@@ -136,6 +136,65 @@ def build_evidence(
                 })
             )
 
+    elif intent == "forecast":
+        result = analytics_engine.forecast(
+            db_path=db_path, store_id=store_id, product_id=product_id,
+            as_of_date=as_of_date, horizon_days=7, config=config,
+        )
+        forecastable = [
+            r for r in result["items"]
+            if r["forecast_status"] in ("SUFFICIENT_DATA", "LIMITED_DATA")
+        ]
+        if forecastable:
+            counts = result["counts"]
+            evidence.append(
+                _compact({
+                    "type": "FORECAST_SUMMARY",
+                    "category": "FACT",
+                    "metric": "counts",
+                    "value": {
+                        "total": counts["total"],
+                        "rising_demand": counts["by_trend"].get("UP", 0),
+                        "falling_demand": counts["by_trend"].get("DOWN", 0),
+                        "inventory_at_risk": counts["by_inventory_outlook"].get("AT_RISK", 0),
+                        "insufficient_data": counts["by_forecast_status"].get("INSUFFICIENT_DATA", 0),
+                    },
+                    "horizon_days": result["horizon_days"],
+                    "analysis_date": result["analysis_date"],
+                })
+            )
+
+            def forecast_rank(row):
+                outlook = {"AT_RISK": 0, "WATCH": 1, "SUFFICIENT": 2}.get(
+                    row.get("inventory_outlook"), 3
+                )
+                trend = {"UP": 0, "DOWN": 1, "STABLE": 2}.get(row.get("trend"), 3)
+                return (outlook, trend, -(row.get("forecast_units") or 0))
+
+            for row in _select(sorted(forecastable, key=forecast_rank), limit):
+                evidence.append(
+                    _compact({
+                        "type": "FORECAST",
+                        "category": "ESTIMATE",
+                        "store_id": row.get("store_id"),
+                        "store_name": row.get("store_name"),
+                        "product_id": row.get("product_id"),
+                        "product_name": row.get("product_name"),
+                        "metric": "forecast_units",
+                        "value": row.get("forecast_units"),
+                        "forecast_status": row.get("forecast_status"),
+                        "horizon_days": row.get("horizon_days"),
+                        "recent_daily_demand": row.get("recent_daily_demand"),
+                        "baseline_daily_demand": row.get("baseline_daily_demand"),
+                        "trend": row.get("trend"),
+                        "current_stock": row.get("current_stock"),
+                        "inventory_outlook": row.get("inventory_outlook"),
+                        "expected_cover_days": row.get("expected_cover_days"),
+                        "analysis_date": row.get("analysis_date"),
+                        "data_status": row.get("forecast_status"),
+                    })
+                )
+
     elif intent in ("spike", "drop", "anomaly"):
         result = analytics_engine.sales_anomalies(
             db_path=db_path, store_id=store_id, product_id=product_id,

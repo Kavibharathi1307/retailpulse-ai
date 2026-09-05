@@ -111,7 +111,7 @@ def main() -> int:
     # ---- Copilot hero ------------------------------------------------------
     check("copilot hero present",
           'id="copilot-form"' in html and 'id="copilot-question"' in html and 'id="copilot-ask"' in html)
-    check("five suggestion chips shipped", html.count('class="suggestion-chip"') == 5)
+    check("six suggestion chips shipped", html.count('class="suggestion-chip"') == 6)
     check("copilot answer/evidence/assumptions containers present",
           'id="copilot-answer"' in html and 'id="copilot-evidence"' in html
           and 'id="copilot-assumptions"' in html and 'id="copilot-result"' in html)
@@ -128,6 +128,8 @@ def main() -> int:
         "store-list", "sales-chart", "attention-list", "attention-count",
         "product-table", "product-tbody", "product-category-filter",
         "data-stores", "data-products", "data-sales", "data-inventory", "global-analysis-date",
+        "outlook-chart", "outlook-tbody", "outlook-rising", "outlook-falling",
+        "outlook-at-risk", "outlook-watch", "outlook-thin", "outlook-note", "outlook-count",
     ):
         check(f"dashboard element id={element_id}", f'id="{element_id}"' in html)
 
@@ -176,6 +178,21 @@ def main() -> int:
     status, products = get_json("/api/analytics/product-performance?limit=1000")
     check("product performance covers 36 products", status == 200 and products["total"] == 36)
 
+    status, forecast_summary = get_json("/api/analytics/forecast-summary?horizon_days=14")
+    check("forecast-summary served for 14 days",
+          status == 200 and forecast_summary["horizon_days"] == 14
+          and forecast_summary["forecast_status"] == "SUFFICIENT_DATA")
+    check("forecast-summary has totals",
+          forecast_summary["counts"]["total"] == 180
+          and forecast_summary["expected_daily_demand"] > 0)
+    status, forecast_items = get_json("/api/analytics/forecast?horizon_days=14&limit=1000")
+    check("forecast served for 14 days", status == 200 and forecast_items["total"] == 180)
+    check("forecast rows carry trend and outlook",
+          all("recent_daily_demand" in row and "forecast_units" in row
+              and "trend" in row and "inventory_outlook" in row for row in forecast_items["items"]))
+    check("forecast-summary matches forecast row counts",
+          forecast_items["counts"]["total"] == forecast_summary["counts"]["total"])
+
     status, health = get_json("/api/health")
     check("health endpoint intact", status == 200 and health["track"] == "PS03")
 
@@ -189,6 +206,13 @@ def main() -> int:
           body["grounded"] is True and len(body["evidence"]) > 0 and body["answer"])
     check("copilot response never leaks the key name",
           "GEMINI_API_KEY" not in raw and "api_key" not in raw and "apiKey" not in raw)
+
+    status, raw = post_json("/api/copilot/query", {"question": "What demand should I expect next week?"})
+    body = json.loads(raw)
+    check("copilot answers a demand-forecast question",
+          status == 200 and body["grounded"] is True
+          and any(ev.get("type") == "FORECAST_SUMMARY" for ev in body["evidence"])
+          and any(ev.get("type") == "FORECAST" for ev in body["evidence"]))
 
     # ---- Served assets: untrusted-text rendering + no secrets --------------
     for asset in ("utils.js", "api.js", "charts.js", "copilot.js", "dashboard.js", "app.js", "styles.css"):

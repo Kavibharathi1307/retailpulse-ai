@@ -77,6 +77,9 @@
           <button type="button" class="suggestion-chip" data-question="How are my stores performing?">
             How are my stores performing?
           </button>
+          <button type="button" class="suggestion-chip" data-question="What demand should I expect next week?">
+            What demand should I expect next week?
+          </button>
         </div>
 
         <form class="copilot-form" id="copilot-form">
@@ -316,6 +319,97 @@
             </div>
           </article>
         </div>
+
+        <section id="outlook" class="section outlook-section" aria-labelledby="outlook-heading">
+          <div class="section-head section-head-row">
+            <div>
+              <h2 id="outlook-heading" class="section-title">Demand Outlook</h2>
+              <p class="section-sub" id="outlook-note">Loading demand forecast&hellip;</p>
+            </div>
+            <div class="segmented" role="group" aria-label="Forecast horizon">
+              <button type="button" class="seg-btn is-active" data-horizon="7">7 days</button>
+              <button type="button" class="seg-btn" data-horizon="14">14 days</button>
+              <button type="button" class="seg-btn" data-horizon="30">30 days</button>
+            </div>
+          </div>
+
+          <div class="outlook-stats" aria-label="Demand outlook summary">
+            <article class="outlook-stat outlook-stat-up">
+              <strong id="outlook-rising">&mdash;</strong>
+              <span>Rising demand</span>
+            </article>
+            <article class="outlook-stat outlook-stat-down">
+              <strong id="outlook-falling">&mdash;</strong>
+              <span>Falling demand</span>
+            </article>
+            <article class="outlook-stat outlook-stat-risk">
+              <strong id="outlook-at-risk">&mdash;</strong>
+              <span>Inventory at risk</span>
+            </article>
+            <article class="outlook-stat outlook-stat-watch">
+              <strong id="outlook-watch">&mdash;</strong>
+              <span>Inventory watch</span>
+            </article>
+            <article class="outlook-stat outlook-stat-thin">
+              <strong id="outlook-thin">&mdash;</strong>
+              <span>Insufficient data</span>
+            </article>
+          </div>
+
+          <div class="grid">
+            <article class="panel outlook-chart-panel">
+              <div class="panel-title-row">
+                <h3 class="panel-title">Historical vs Forecast Demand</h3>
+                <span class="panel-context" id="outlook-chart-context"></span>
+              </div>
+              <div class="chart-wrap">
+                <svg
+                  id="outlook-chart"
+                  class="sales-chart"
+                  role="img"
+                  aria-label="Historical daily demand and the expected demand forecast"
+                  viewBox="0 0 840 300"
+                  preserveAspectRatio="none"
+                ></svg>
+              </div>
+              <div class="chart-legend" aria-hidden="true">
+                <span class="legend-key"><i class="key-line"></i>Historical daily units</span>
+                <span class="legend-key"><i class="key-dash"></i>Expected demand</span>
+              </div>
+            </article>
+
+            <article class="panel outlook-table-panel">
+              <div class="panel-title-row">
+                <h3 class="panel-title">Product Demand Outlook</h3>
+                <span class="count-badge" id="outlook-count">0</span>
+              </div>
+              <div class="table-wrap">
+                <table class="data-table" id="outlook-table">
+                  <caption class="visually-hidden">
+                    Product demand outlook: current stock, daily demand, forecast demand, demand trend and inventory outlook
+                  </caption>
+                  <thead>
+                    <tr>
+                      <th>Product</th>
+                      <th>Store</th>
+                      <th>Stock</th>
+                      <th>Daily demand</th>
+                      <th>Forecast demand</th>
+                      <th>Trend</th>
+                      <th>Inventory outlook</th>
+                    </tr>
+                  </thead>
+                  <tbody id="outlook-tbody">
+                    <tr>
+                      <td colspan="7" class="state-note">Loading demand outlook&hellip;</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p class="panel-foot" id="outlook-foot"></p>
+            </article>
+          </div>
+        </section>
 
         <div class="dataset-strip" aria-label="Dataset summary">
           <span>Stores <b id="data-stores">&mdash;</b></span>

@@ -219,3 +219,204 @@ function updateSalesChart(metric, range) {
   chartRange = range || chartRange;
   renderChart();
 }
+
+// --- Demand outlook chart (Milestone 7) -----------------------------------
+
+let outlookSeries = [];
+let outlookForecastDaily = 0;
+let outlookHorizon = 7;
+let outlookAnalysisDate = "";
+let outlookSvg = null;
+
+function addDaysIso(iso, days) {
+  const parts = String(iso).split("-").map(Number);
+  if (parts.length !== 3) {
+    return iso;
+  }
+  const dt = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2] + days));
+  const mm = String(dt.getUTCMonth() + 1).padStart(2, "0");
+  const dd = String(dt.getUTCDate()).padStart(2, "0");
+  return `${dt.getUTCFullYear()}-${mm}-${dd}`;
+}
+
+function renderOutlookChart() {
+  if (!outlookSvg) {
+    return;
+  }
+  clearNode(outlookSvg);
+
+  const { width, height, padL, padR, padT, padB } = CHART_LAYOUT;
+  const hist = outlookSeries;
+  const horizon = Math.max(1, Number(outlookHorizon) || 7);
+  const forecastDaily = Number(outlookForecastDaily) || 0;
+
+  if (hist.length < 2) {
+    const emptyText = svgNode("text", { x: width / 2, y: height / 2, "text-anchor": "middle" });
+    emptyText.classList.add("chart-empty");
+    emptyText.textContent = "Not enough history to chart the demand outlook.";
+    outlookSvg.appendChild(emptyText);
+    return;
+  }
+
+  const histLen = hist.length;
+  const total = histLen + horizon;
+  const innerW = width - padL - padR;
+  const innerH = height - padT - padB;
+  const maxHist = Math.max(...hist.map((p) => Number(p.units) || 0));
+  const maxValue = Math.max(maxHist, forecastDaily, 1);
+  const minValue = 0;
+  const span = maxValue - minValue || 1;
+
+  const xAt = (index) => padL + (index / (total - 1)) * innerW;
+  const yAt = (value) => padT + (1 - (value - minValue) / span) * innerH;
+
+  const grid = svgNode("g", { class: "chart-grid" });
+  const gridCount = 4;
+  for (let i = 0; i <= gridCount; i += 1) {
+    const value = minValue + (span * i) / gridCount;
+    const y = yAt(value);
+    grid.appendChild(svgNode("line", { x1: padL, x2: width - padR, y1: y, y2: y }));
+    const label = svgNode("text", { x: padL - 10, y: y + 4 });
+    label.classList.add("chart-axis");
+    label.setAttribute("text-anchor", "end");
+    label.textContent = formatNumberCompact(value);
+    grid.appendChild(label);
+  }
+  outlookSvg.appendChild(grid);
+
+  const axisEnd = outlookAnalysisDate ? addDaysIso(outlookAnalysisDate, horizon) : "";
+  const tickData = [
+    [0, hist[0].date],
+    [histLen - 1, outlookAnalysisDate || hist[histLen - 1].date],
+    [total - 1, axisEnd],
+  ];
+  const labels = svgNode("g", { class: "chart-ticks" });
+  for (const [index, dateText] of tickData) {
+    const tick = svgNode("text", { x: xAt(index), y: height - padB + 22 });
+    tick.classList.add("chart-axis");
+    tick.setAttribute("text-anchor", index === 0 ? "start" : index === total - 1 ? "end" : "middle");
+    tick.textContent = formatShortDate(dateText);
+    labels.appendChild(tick);
+  }
+  outlookSvg.appendChild(labels);
+
+  const histPath = hist
+    .map((point, index) => `${index === 0 ? "M" : "L"}${xAt(index).toFixed(1)},${yAt(Number(point.units) || 0).toFixed(1)}`)
+    .join(" ");
+  const histAreaPath =
+    histPath +
+    ` L${xAt(histLen - 1).toFixed(1)},${yAt(minValue).toFixed(1)}` +
+    ` L${xAt(0).toFixed(1)},${yAt(minValue).toFixed(1)} Z`;
+
+  const area = svgNode("path", { d: histAreaPath });
+  area.classList.add("chart-area");
+  const line = svgNode("path", { d: histPath });
+  line.classList.add("chart-line");
+  outlookSvg.appendChild(area);
+  outlookSvg.appendChild(line);
+
+  const fY = yAt(forecastDaily);
+  const boundaryX = xAt(histLen - 1);
+  const forecastLine = svgNode("line", {
+    x1: boundaryX,
+    y1: fY,
+    x2: xAt(total - 1),
+    y2: fY,
+  });
+  forecastLine.classList.add("chart-line-forecast");
+  outlookSvg.appendChild(forecastLine);
+
+  const divider = svgNode("line", {
+    x1: boundaryX,
+    y1: padT,
+    x2: boundaryX,
+    y2: height - padB,
+  });
+  divider.classList.add("chart-divider");
+  outlookSvg.appendChild(divider);
+  const dividerLabel = svgNode("text", { x: boundaryX + 6, y: padT + 14 });
+  dividerLabel.classList.add("chart-divider-label");
+  dividerLabel.textContent = "Forecast";
+  outlookSvg.appendChild(dividerLabel);
+
+  const forecastDot = svgNode("circle", { cx: boundaryX, cy: fY, r: 4 });
+  forecastDot.classList.add("chart-forecast-dot");
+  outlookSvg.appendChild(forecastDot);
+
+  const overlay = svgNode("rect", {
+    x: padL,
+    y: padT,
+    width: innerW,
+    height: innerH,
+    fill: "transparent",
+  });
+  overlay.classList.add("chart-overlay");
+  const tooltip = svgNode("g", { class: "chart-tooltip" });
+  tooltip.setAttribute("opacity", "0");
+  outlookSvg.appendChild(overlay);
+  outlookSvg.appendChild(tooltip);
+
+  overlay.addEventListener("mousemove", (event) => {
+    const bounds = outlookSvg.getBoundingClientRect();
+    const scaleX = CHART_LAYOUT.width / (bounds.width || 1);
+    const cursorX = (event.clientX - bounds.left) * scaleX;
+    const ratio = (cursorX - padL) / innerW;
+    const index = Math.min(total - 1, Math.max(0, Math.round(ratio * (total - 1))));
+    const tx = xAt(index);
+    const ty = index < histLen ? yAt(Number(hist[index].units) || 0) : fY;
+    showOutlookTooltip(tooltip, index, hist, forecastDaily, tx, ty, width, horizon);
+    moveCrosshair(outlookSvg, tx, padT, padB, ty);
+  });
+
+  overlay.addEventListener("mouseleave", () => {
+    tooltip.setAttribute("opacity", "0");
+    const crosshair = outlookSvg.querySelector(".chart-crosshair");
+    if (crosshair) {
+      crosshair.setAttribute("display", "none");
+    }
+  });
+
+  outlookSvg.setAttribute(
+    "aria-label",
+    `Historical daily demand across ${histLen} days with an expected demand forecast for the next ${horizon} days`,
+  );
+}
+
+function showOutlookTooltip(tooltip, index, hist, forecastDaily, tx, ty, width, horizon) {
+  const isForecast = index >= hist.length;
+  const titleText = svgNode("text", { x: 0, y: 0, class: "chart-tooltip-title" });
+  const valueText = svgNode("text", { x: 0, y: 16, class: "chart-tooltip-value" });
+  if (isForecast) {
+    const daysAhead = index - hist.length + 1;
+    titleText.textContent = `Expected day ${daysAhead} of ${horizon}`;
+    valueText.textContent = `~${formatNumber(forecastDaily)} units/day`;
+  } else {
+    const point = hist[index];
+    titleText.textContent = formatDateLabel(point.date);
+    valueText.textContent = `${formatNumber(Number(point.units) || 0)} units sold`;
+  }
+  const rect = svgNode("rect", { width: 168, height: 30, rx: 6 });
+  rect.classList.add("chart-tooltip-bg");
+  clearNode(tooltip);
+  tooltip.appendChild(rect);
+  tooltip.appendChild(titleText);
+  tooltip.appendChild(valueText);
+  let dx = tx - 84;
+  dx = Math.max(CHART_LAYOUT.padL, Math.min(width - CHART_LAYOUT.padR - 168, dx));
+  const dy = Math.max(CHART_LAYOUT.padT + 2, ty - 46);
+  tooltip.setAttribute("transform", `translate(${dx.toFixed(1)}, ${dy.toFixed(1)})`);
+  tooltip.setAttribute("opacity", "1");
+}
+
+function initOutlookChart(element) {
+  outlookSvg = element;
+}
+
+function setOutlookData(series, summary) {
+  outlookSeries = Array.isArray(series) ? series : [];
+  const data = summary || {};
+  outlookForecastDaily = Number(data.expected_daily_demand) || 0;
+  outlookHorizon = Number(data.horizon_days) || 7;
+  outlookAnalysisDate = data.analysis_date || "";
+  renderOutlookChart();
+}

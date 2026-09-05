@@ -12,7 +12,7 @@ questions and surfacing what needs attention.
 
 ## Current Status
 
-Current milestone: **Milestone 5 — Hackathon-Winning Dashboard & UX**.
+Current milestone: **Milestone 7 — Explainable Demand Forecasting**.
 
 Implemented:
 
@@ -23,26 +23,31 @@ Implemented:
   evidence-first answers), KPI cards, inventory health bar, store
   performance, an interactive SVG sales trend chart (30d / 90d / All,
   Revenue / Units), a severity-filtered attention centre, a sortable and
-  category-filterable product table, and a dataset strip — every number is
-  fetched live from the APIs, nothing is hardcoded.
+  category-filterable product table, a **Demand Outlook** section (horizon
+  selector, forecast summary chips, historical-vs-forecast chart and a
+  product demand table), and a dataset strip — every number is fetched live
+  from the APIs, nothing is hardcoded.
 - A **local SQLite retail data layer** (`data/retailpulse.db`) with realistic,
   deterministic sample data for stores, products, daily sales, and inventory.
 - JSON API endpoints to read stores, products, sales, and inventory.
 - A **deterministic analytics engine** (`src/analytics/`) with **no AI**: pure,
   rule-based stock-out risk, overstock and slow-mover detection, sales
-  spike/drop detection, product and store performance, plus a severity-sorted
-  attention summary with explicit evidence for every finding.
-- Analytics API endpoints under `/api/analytics`.
+  spike/drop detection, product and store performance, **actionable
+  recommended actions**, **explainable demand forecasting** for 7/14/30-day
+  horizons, plus a severity-sorted attention summary with explicit evidence
+  for every finding.
+- Analytics API endpoints under `/api/analytics` including
+  `/api/analytics/forecast` and `/api/analytics/forecast-summary`.
 - A **grounded natural-language copilot** (`src/gemini/` + `/api/copilot/query`)
   that answers retail questions with Google Gemini, where Gemini may only use
-  evidence produced by the deterministic analytics engine.
+  evidence produced by the deterministic analytics engine — including
+  demand-forecast questions answered strictly as estimates.
 - Automated analytics unit tests and HTTP-level API verification plus a fully
-  mocked M4 test suite (no API key required to run the tests).
+  mocked M4/M7 test suite (no API key required to run the tests).
 
 Not implemented yet (future milestones):
 
 - Embeddings and RAG / vector-database evidence retrieval.
-- The final analytics + copilot dashboard.
 
 The analytics layer derives every conclusion from the raw numbers — no
 analytical labels are stored in the database. The dataset intentionally
@@ -228,8 +233,8 @@ deterministic analytics engine, never external knowledge.
 
 **Supported question intents.** `stockout`, `reorder`, `overstock`,
 `slow_movers`, `spike`, `drop`, `product_performance`, `store_performance`,
-`attention`, and `unsupported` (gracefully refused where the data cannot
-answer or the topic is outside the retail data).
+`attention`, `forecast`, and `unsupported` (gracefully refused where the data
+cannot answer or the topic is outside the retail data).
 
 **Response shape** (for every question):
 
@@ -269,6 +274,52 @@ answer or the topic is outside the retail data).
   frontend as plain text, so no HTML/script injection is possible.
 - No `eval`, `exec`, or dynamic code execution anywhere in the pipeline.
 
+## Demand Forecasting (Milestone 7)
+
+`src/analytics/forecast.py` is a pure, deterministic forecasting module exposed
+through the engine and two APIs:
+
+| Endpoint                  | Description                                             |
+| ------------------------- | ------------------------------------------------------- |
+| `GET /api/analytics/forecast?horizon_days=7|14|30` | Per store/product expected demand with status, trend, inventory outlook, and full evidence. |
+| `GET /api/analytics/forecast-summary?horizon_days=7|14|30` | Portfolio totals: expected daily and horizon demand plus counts by status, trend and outlook. |
+
+**Method.** Expected demand for a store/product over the chosen horizon is the
+**recent daily sales rate × horizon days**. The recent window is the 7 calendar
+days ending at the analysis date; a separate 28-day baseline window ending
+before the recent window is used **only** to derive the demand trend, never the
+expected figures. Rates are computed over the number of covered calendar days
+that intersect the dataset, so the numbers stay explainable.
+
+**Sufficiency states.** `INSUFFICIENT_DATA` when fewer than 7 covered days of
+recent history exist (nothing is fabricated); `LIMITED_DATA` when fewer than 14
+covered baseline days exist; otherwise `SUFFICIENT_DATA`. An aggregate
+forecast status is reported using the best available state, with full counts by
+state always included for transparency.
+
+**Trend.** `UP` / `DOWN` / `STABLE` from the same 15% directional threshold used
+elsewhere; `UNKNOWN` when history is insufficient. Zero-demand products get an
+honest zero forecast.
+
+**Inventory outlook.** Compares current stock with the expected horizon demand:
+`AT_RISK` when stock covers less than the expected demand, `WATCH` when it
+covers up to 125% of it, `SUFFICIENT` beyond that. When demand is zero or
+history is insufficient the outlook is never a fabricated stock-out — it is
+reported truthfully instead.
+
+**Explainability.** Every forecast row carries an `evidence` block with the
+exact windows, covered days, required days, threshold, buffer, and the two
+daily rates, plus a plain-text `explanation`. The copilot routes
+demand-forecast questions to `forecast` and strictest grounding and fact/estimate
+categories (`FORECAST` evidence is always `ESTIMATE`), and answers
+"Insufficient historical data for a reliable forecast." when the evidence is
+empty.
+
+**Dashboard.** The Demand Outlook section lets the user switch the horizon
+(7/14/30 days) and shows summary chips, a chart of the historical demand line
+with a dashed expected-demand forecast and "Forecast" divider, and a table of
+per-product expected demand, trend and inventory outlook.
+
 ## API Endpoints
 
 | Endpoint                     | Description                                            |
@@ -287,6 +338,9 @@ answer or the topic is outside the retail data).
 | `GET /api/analytics/sales-anomalies` | Sales spikes/drops. Filters: `store_id`, `product_id`, `as_of_date`, `start_date`, `end_date`. |
 | `GET /api/analytics/product-performance` | Per-product performance. Filters: `product_id`, `as_of_date`, `start_date`, `end_date`. |
 | `GET /api/analytics/store-performance`   | Per-store performance. Filters: `store_id`, `as_of_date`, `start_date`, `end_date`. |
+| `GET /api/analytics/recommendations`     | Actionable recommended actions. Filters: `store_id`, `product_id`, `as_of_date`. |
+| `GET /api/analytics/forecast`            | Per store/product expected demand. Filters: `store_id`, `product_id`, `as_of_date`, `horizon_days` (7/14/30). |
+| `GET /api/analytics/forecast-summary`    | Portfolio demand totals. Filters: `store_id`, `product_id`, `as_of_date`, `horizon_days` (7/14/30). |
 | `POST /api/copilot/query` | Natural-language retail query. Body: `{ "question": "..." }`. Returns the grounded answer, intent, evidence, assumptions, data status, and AI status. |
 
 Data endpoints return `{items, total, limit, offset}`. Analytics list endpoints
@@ -324,10 +378,10 @@ a real API key to the repository.
   split into `config.py` (all thresholds), `data.py` (all SQL reads),
   `metrics.py` (shared numeric helpers), and one module per category
   (`performance.py`, `stock.py`, `velocity.py`, `anomalies.py`,
-  `attention.py`) orchestrated by `engine.py` and exposed by
-  `src/analytics_api.py`. Calculation modules never touch the database; SQL
-  lives only in `data.py`. The `attention` module emits the evidence the
-  copilot relies on.
+  `attention.py`, `recommendations.py`, `forecast.py`) orchestrated by
+  `engine.py` and exposed by `src/analytics_api.py`. Calculation modules never
+  touch the database; SQL lives only in `data.py`. The `attention` module
+  emits the evidence the copilot relies on.
 - **Grounded copilot** — `src/gemini/` holds the no-AI routing glue:
   `intents.py` (deterministic keyword classification), `evidence.py` (runs the
   analytics engine and builds the fact block independent of Gemini),
@@ -360,16 +414,20 @@ python -m unittest tests.test_analytics -v   # analytics engine unit tests
 python tests/verify_analytics_api.py  # HTTP-level checks of the analytics APIs
 python -m unittest tests.test_copilot -v     # copilot unit tests (mocked Gemini)
 python tests/verify_copilot_api.py    # HTTP-level checks of the copilot + frontend
-python tests/verify_frontend.py       # HTTP-level checks of the M5 dashboard + truthful numbers
+python -m unittest tests.test_forecast -v    # demand-forecast unit tests
+python tests/verify_frontend.py       # HTTP-level checks of the M5/M7 dashboard + truthful numbers
 ```
 
 The unit tests build a tiny synthetic retail database with controlled patterns
 (zero-sales product, slow mover, overstock, a spike, a drop, short history) and
 assert the exact statuses, numbers, and `INSUFFICIENT_DATA` behavior the engine
-must produce. The copilot tests additionally verify intent routing,
-evidence-based grounding, the no-fabrication contract, every Gemini failure
-mode's fallback, and the security checks (key never in frontend/responses, no
-`eval`/`exec`, Gemini output rendered as untrusted text).
+must produce — the forecast tests add rising/falling/zero-demand products,
+inventory at/below the buffer, and short-history insufficiency. The copilot
+tests additionally verify intent routing, evidence-based grounding, the
+no-fabrication contract, the demand-forecast estimate contract, every Gemini
+failure mode's fallback, and the security checks (key never in
+frontend/responses, no `eval`/`exec`, Gemini output rendered as untrusted
+text).
 
 **Using the copilot.** Ask questions in the Copilot panel (suggestion chips are
 provided) or call:
