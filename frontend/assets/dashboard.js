@@ -388,6 +388,112 @@ function applyAttentionFilter() {
   }
 }
 
+// --- Recommended actions --------------------------------------------------
+
+const MAX_RECOMMENDATIONS_VISIBLE = 12;
+
+function recommendationTypeLabel(type) {
+  return {
+    REPLENISH: "Replenish",
+    REDUCE_INVENTORY: "Reduce inventory",
+    REVIEW_SLOW_MOVER: "Review slow mover",
+    INVESTIGATE_SALES_DROP: "Investigate drop",
+    MONITOR_DEMAND: "Monitor demand",
+  }[type] || prettyKey(type);
+}
+
+function renderRecommendations(recommendations) {
+  const list = document.getElementById("recommendations-list");
+  const countEl = document.getElementById("recommendations-count");
+  const noteEl = document.getElementById("recommendations-note");
+  clearNode(list);
+
+  if (!recommendations || !Array.isArray(recommendations.items)) {
+    list.appendChild(stateNote("Unable to load recommended actions."));
+    countEl.textContent = "0";
+    if (noteEl) {
+      noteEl.textContent = "";
+    }
+    return;
+  }
+  const items = recommendations.items;
+  countEl.textContent = formatNumber(recommendations.total);
+  if (noteEl) {
+    const analysisDate = recommendations.analysis_date ? formatDateLabel(recommendations.analysis_date) : "";
+    noteEl.textContent = analysisDate ? `Deterministic recommended actions as of ${analysisDate}.` : "";
+  }
+  if (items.length === 0) {
+    list.appendChild(stateNote("No recommendations to show for the current filters."));
+    return;
+  }
+
+  const visible = items.slice(0, MAX_RECOMMENDATIONS_VISIBLE);
+  for (const rec of visible) {
+    const node = document.createElement("article");
+    node.className = `recommendation-item recommendation-${String(rec.priority).toLowerCase()}`;
+    const card = document.createElement("div");
+    card.className = "recommendation-card";
+
+    const head = document.createElement("div");
+    head.className = "recommendation-head";
+    head.appendChild(severityBadge(rec.priority));
+    head.appendChild(pillElement(recommendationTypeLabel(rec.type), "issue-pill"));
+    if (rec.data_status) {
+      head.appendChild(pillElement(prettyKey(rec.data_status), "type-pill"));
+    }
+    card.appendChild(head);
+
+    const title = document.createElement("div");
+    title.className = "recommendation-title";
+    title.textContent = [rec.product_name, rec.store_name].filter(Boolean).join(" \u00b7 ") || "Unknown item";
+    card.appendChild(title);
+
+    if (rec.reason) {
+      const reason = document.createElement("p");
+      reason.className = "recommendation-reason";
+      reason.textContent = rec.reason;
+      card.appendChild(reason);
+    }
+
+    if (rec.action) {
+      const action = document.createElement("p");
+      action.className = "recommendation-action";
+      action.textContent = rec.action;
+      card.appendChild(action);
+    }
+
+    const details = document.createElement("details");
+    details.className = "evidence-details";
+    const summary = document.createElement("summary");
+    summary.textContent = "View evidence";
+    details.appendChild(summary);
+    const dl = document.createElement("dl");
+    dl.className = "evidence-grid";
+    const evidenceMap = rec.evidence && typeof rec.evidence === "object" ? rec.evidence : {};
+    for (const [key, value] of Object.entries(evidenceMap)) {
+      const dt = document.createElement("dt");
+      dt.textContent = prettyKey(key);
+      const dd = document.createElement("dd");
+      dd.textContent = evidenceValueLabel(key, value);
+      dl.appendChild(dt);
+      dl.appendChild(dd);
+    }
+    if (!dl.childElementCount) {
+      const emptyNote = document.createElement("dd");
+      emptyNote.textContent = "No numeric evidence available.";
+      dl.appendChild(emptyNote);
+    }
+    details.appendChild(dl);
+    card.appendChild(details);
+
+    node.appendChild(card);
+    list.appendChild(node);
+  }
+  if (items.length > MAX_RECOMMENDATIONS_VISIBLE) {
+    list.appendChild(stateNote(`Showing ${MAX_RECOMMENDATIONS_VISIBLE} of ${formatNumber(items.length)} recommendations.`));
+  }
+}
+
 // --- Product performance --------------------------------------------------
 
 let productRows = [];
@@ -613,9 +719,10 @@ async function bootDashboard() {
     prefer("/api/analytics/attention-summary?limit=1000"),
     prefer("/api/analytics/product-performance?limit=1000"),
     prefer("/api/analytics/store-performance?limit=1000"),
+    prefer("/api/analytics/recommendations?limit=20"),
   ]);
 
-  const [health, summary, series, inventory, stockout, overstock, slow, attention, products, stores] = results;
+  const [health, summary, series, inventory, stockout, overstock, slow, attention, products, stores, recommendations] = results;
 
   const seriesItems = Array.isArray(series && series.items)
     ? series.items.map((day) => ({
@@ -631,6 +738,7 @@ async function bootDashboard() {
   renderStores(stores, stockout);
   renderAttention(attention);
   renderProducts(products, inventory, stockout);
+  renderRecommendations(recommendations);
   renderDatasetStrip(summary, attention, series);
 
   setSalesSeries(seriesItems.length > 0 ? seriesItems : []);

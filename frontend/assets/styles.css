@@ -685,7 +685,8 @@ body {
 
 .trend-panel,
 .attention-panel,
-.products-panel {
+.products-panel,
+.recommendations-panel {
   grid-column: 1 / -1;
 }
 
@@ -1066,6 +1067,58 @@ body {
 
 .evidence-details[open] summary {
   margin-bottom: 8px;
+}
+
+/* --- Recommended actions -------------------------------------------------- */
+
+.recommendations-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.recommendation-item {
+  border-left: 3px solid var(--border-strong);
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.recommendation-critical { border-left-color: var(--risk); }
+.recommendation-high { border-left-color: var(--over); }
+.recommendation-medium { border-left-color: var(--slow); }
+
+.recommendation-card {
+  padding: 12px 14px;
+}
+
+.recommendation-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.recommendation-title {
+  font-weight: 600;
+  font-size: 0.93rem;
+}
+
+.recommendation-reason {
+  margin: 4px 0 6px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: #334155;
+}
+
+.recommendation-action {
+  margin: 0 0 6px;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--accent-strong);
+  font-weight: 600;
 }
 
 /* --- Product table ----------------------------------------------------------- */

@@ -14,6 +14,9 @@ from fastapi import APIRouter, HTTPException, Query
 from src import repositories
 from src.analytics import data as analytics_data
 from src.analytics import engine as analytics_engine
+import importlib
+
+analytics_recommendations = importlib.import_module("src.analytics.recommendations")
 from src.analytics.config import DEFAULT_CONFIG
 from src.config import DATABASE_PATH
 
@@ -21,6 +24,16 @@ router = APIRouter(prefix="/api/analytics", tags=["analytics"])
 
 DEFAULT_LIMIT = 100
 MAX_LIMIT = 1000
+
+VALID_PRIORITIES = {"CRITICAL", "HIGH", "MEDIUM", "LOW"}
+
+VALID_RECOMMENDATION_TYPES = {
+    "REPLENISH",
+    "REDUCE_INVENTORY",
+    "REVIEW_SLOW_MOVER",
+    "INVESTIGATE_SALES_DROP",
+    "MONITOR_DEMAND",
+}
 
 
 def _bounded_limit(limit: int) -> int:
@@ -330,4 +343,64 @@ def store_performance(
         "period_start": result["period_start"],
         "period_end": result["period_end"],
         **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/recommendations")
+def recommendations(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    priority: Optional[str] = Query(None),
+    recommendation_type: Optional[str] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    if priority is not None and priority.upper() not in VALID_PRIORITIES:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_priority",
+                "message": (
+                    "priority must be one of "
+                    + ", ".join(sorted(VALID_PRIORITIES))
+                ),
+            },
+        )
+    if (
+        recommendation_type is not None
+        and recommendation_type.upper() not in VALID_RECOMMENDATION_TYPES
+    ):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_recommendation_type",
+                "message": (
+                    "recommendation_type must be one of "
+                    + ", ".join(sorted(VALID_RECOMMENDATION_TYPES))
+                ),
+            },
+        )
+    result = _run(
+        lambda: analytics_recommendations.recommendations(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    items = result["items"]
+    if priority is not None:
+        items = [item for item in items if item["priority"] == priority.upper()]
+    if recommendation_type is not None:
+        items = [item for item in items if item["type"] == recommendation_type.upper()]
+    return {
+        "analysis_date": result["analysis_date"],
+        "counts": result["counts"],
+        **_page(items, limit, offset),
     }

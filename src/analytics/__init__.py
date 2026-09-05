@@ -15,6 +15,7 @@ from src.analytics.engine import (
     stockout_risks,
     store_performance,
 )
+from src.analytics.recommendations import recommendations
 
 __all__ = [
     "AnalyticsConfig",
@@ -22,6 +23,7 @@ __all__ = [
     "attention_summary",
     "overstock",
     "product_performance",
+    "recommendations",
     "sales_anomalies",
     "slow_movers",
     "stockout_risks",
