@@ -309,7 +309,7 @@ function attentionItem(item) {
   return node;
 }
 
-const severityBadge = (value) => {
+function severityBadge(value) {
   const meta = {
     CRITICAL: { label: "Critical", className: "sev-critical", dot: "dot-red" },
     HIGH: { label: "High", className: "sev-high", dot: "dot-orange" },
@@ -324,7 +324,7 @@ const severityBadge = (value) => {
   badge.appendChild(dot);
   badge.appendChild(document.createTextNode(meta ? meta.label : String(value == null ? "" : value)));
   return badge;
-};
+}
 
 function evidenceValueLabel(key, value) {
   if (value === null || value === undefined || value === "") {
@@ -994,7 +994,7 @@ async function bootDashboard() {
     prefer("/api/health"),
     prefer("/api/data/summary"),
     prefer("/api/data/sales-series"),
-    prefer("/api/inventory?limit=1000"),
+    prefer("/api/inventory?limit=500"),
     prefer("/api/analytics/stock-out-risks?limit=1000"),
     prefer("/api/analytics/overstock?limit=1000"),
     prefer("/api/analytics/slow-movers?limit=1000"),
