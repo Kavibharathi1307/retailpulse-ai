@@ -5,174 +5,329 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="RetailPulse AI -- Sales &amp; Inventory Copilot for small retail store managers."
+      content="RetailPulse AI — AI-Powered Sales &amp; Inventory Copilot. Evidence-backed answers about your retail sales, inventory and demand."
     />
-    <title>RetailPulse AI</title>
+    <meta name="theme-color" content="#0f172a" />
+    <title>RetailPulse AI — Sales &amp; Inventory Copilot</title>
     <link rel="stylesheet" href="/assets/styles.css" />
   </head>
   <body>
+    <a class="skip-link" href="#dashboard">Skip to content</a>
+
     <header class="app-header">
-      <div class="brand">
-        <h1>RetailPulse AI</h1>
-        <p>Sales &amp; Inventory Copilot</p>
+      <div class="header-inner">
+        <a class="brand" href="#top" aria-label="RetailPulse AI home">
+          <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M4 18h5l3-8 5 14 4-9 3 3h4"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2.6"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            />
+            <circle cx="4" cy="18" r="2" fill="currentColor" />
+          </svg>
+          <span class="brand-text">
+            <span class="brand-name">RetailPulse&nbsp;AI</span>
+            <span class="brand-sub">AI-Powered Sales &amp; Inventory Copilot</span>
+          </span>
+        </a>
+
+        <nav class="main-nav" aria-label="Primary">
+          <a href="#dashboard">Dashboard</a>
+          <a href="#copilot">Copilot</a>
+          <a href="#analytics">Analytics</a>
+        </nav>
+
+        <div class="header-right">
+          <span class="track-badge">NexusTiQ24 &middot; PS03</span>
+          <div class="status-pills" role="status">
+            <span class="status-pill" id="status-backend">
+              <span class="dot dot-neutral" aria-hidden="true"></span>Backend&hellip;
+            </span>
+            <span class="status-pill" id="status-gemini">
+              <span class="dot dot-neutral" aria-hidden="true"></span>Gemini&hellip;
+            </span>
+          </div>
+        </div>
       </div>
-      <span id="engine-status" class="engine-status">Checking&hellip;</span>
     </header>
 
-    <main class="layout">
-      <section class="kpi-row" aria-label="Key performance indicators">
-        <article class="kpi-card placeholder">
-          <h3>Today&rsquo;s Sales</h3>
-          <p class="kpi-value">&mdash;</p>
-        </article>
-        <article class="kpi-card placeholder">
-          <h3>Revenue</h3>
-          <p class="kpi-value">&mdash;</p>
-        </article>
-        <article class="kpi-card placeholder">
-          <h3>Stock Level</h3>
-          <p class="kpi-value">&mdash;</p>
-        </article>
-        <article class="kpi-card placeholder">
-          <h3>Low Inventory Flags</h3>
-          <p class="kpi-value">&mdash;</p>
-        </article>
-      </section>
-
-      <section class="panel data-status" aria-label="Retail data status">
-        <h2 class="panel-title">Retail Data Layer</h2>
-        <div class="data-status-grid">
-          <article class="kpi-card">
-            <h3>Stores</h3>
-            <p class="kpi-value" id="data-stores">&mdash;</p>
-          </article>
-          <article class="kpi-card">
-            <h3>Products</h3>
-            <p class="kpi-value" id="data-products">&mdash;</p>
-          </article>
-          <article class="kpi-card">
-            <h3>Sales Records</h3>
-            <p class="kpi-value" id="data-sales">&mdash;</p>
-          </article>
-          <article class="kpi-card">
-            <h3>Inventory Records</h3>
-            <p class="kpi-value" id="data-inventory">&mdash;</p>
-          </article>
-        </div>
-        <p class="placeholder-body" id="data-range">
-          Loading sales history&hellip;
+    <main id="top" class="page">
+      <section id="copilot" class="hero copilot-hero" aria-labelledby="copilot-heading">
+        <h2 id="copilot-heading" class="hero-title">Ask RetailPulse AI</h2>
+        <p class="hero-sub">
+          Get evidence-backed answers about your sales, inventory and demand.
         </p>
-        <div class="data-preview">
-          <h3>Recent Sales Preview</h3>
-          <table class="preview-table">
-            <thead>
-              <tr>
-                <th>Date</th>
-                <th>Store</th>
-                <th>Product</th>
-                <th>Qty</th>
-                <th>Revenue</th>
-              </tr>
-            </thead>
-            <tbody id="sales-preview">
-              <tr>
-                <td colspan="5" class="placeholder-body">Loading&hellip;</td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-      </section>
 
-      <section class="panel data-status analytics-status" aria-label="Analytics engine status">
-        <h2 class="panel-title">Retail Analytics Engine</h2>
-        <p class="placeholder-body" id="analytics-range">
-          Loading analytics&hellip;
+        <div class="copilot-suggestions" id="copilot-suggestions" aria-label="Example questions">
+          <button type="button" class="suggestion-chip" data-question="What needs my attention?">
+            What needs my attention?
+          </button>
+          <button type="button" class="suggestion-chip" data-question="Which products are at risk of stock-out?">
+            Which products are at risk of stock-out?
+          </button>
+          <button type="button" class="suggestion-chip" data-question="What is overstocked?">
+            What is overstocked?
+          </button>
+          <button type="button" class="suggestion-chip" data-question="Which products had a sales drop?">
+            Which products had a sales drop?
+          </button>
+          <button type="button" class="suggestion-chip" data-question="How are my stores performing?">
+            How are my stores performing?
+          </button>
+        </div>
+
+        <form class="copilot-form" id="copilot-form">
+          <label for="copilot-question" class="visually-hidden">Ask a question about your sales and inventory</label>
+          <input
+            type="text"
+            id="copilot-question"
+            class="copilot-input"
+            placeholder="e.g. Which products are at risk of stock-out?"
+            maxlength="500"
+            autocomplete="off"
+            enterkeyhint="send"
+          />
+          <button type="submit" id="copilot-ask" class="copilot-ask">Ask</button>
+        </form>
+
+        <p class="copilot-status" id="copilot-status" aria-live="polite">
+          Answers are grounded in the deterministic analytics engine.
         </p>
-        <div class="data-status-grid">
-          <article class="kpi-card">
-            <h3>Stock-Out Risks</h3>
-            <p class="kpi-value" id="analytics-stockout">&mdash;</p>
+
+        <div class="copilot-result" id="copilot-result" hidden>
+          <section class="answer-block" aria-labelledby="answer-heading">
+            <div class="block-header">
+              <h3 id="answer-heading">AI Answer</h3>
+              <span class="grounded-pill" id="copilot-grounded" hidden>
+                <span aria-hidden="true">&#10003;</span> Evidence grounded
+              </span>
+            </div>
+            <p class="copilot-answer" id="copilot-answer"></p>
+          </section>
+
+          <section class="answer-block" aria-labelledby="why-heading">
+            <h3 id="why-heading">Why this answer?</h3>
+            <div class="copilot-evidence" id="copilot-evidence"></div>
+          </section>
+
+          <section class="answer-block" aria-labelledby="assumptions-heading">
+            <h3 id="assumptions-heading">Assumptions</h3>
+            <ul class="copilot-assumptions" id="copilot-assumptions"></ul>
+          </section>
+
+          <section class="answer-block status-row" aria-label="Response status">
+            <div class="status-badge" id="copilot-data-status"></div>
+            <div class="status-badge" id="copilot-ai-status"></div>
+          </section>
+        </div>
+      </section>
+
+      <section id="dashboard" class="section kpi-section" aria-labelledby="kpi-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="kpi-heading" class="section-title">Data Pulse</h2>
+            <p class="section-sub" id="kpi-note">Loading sales data&hellip;</p>
+          </div>
+        </div>
+        <div class="kpi-row">
+          <article class="kpi-card" aria-label="Latest sales">
+            <span class="kpi-icon kpi-icon-blue" aria-hidden="true">&#8682;</span>
+            <div>
+              <h3>Latest Sales</h3>
+              <p class="kpi-value" id="kpi-latest-sales">&mdash;</p>
+              <p class="kpi-sub" id="kpi-latest-sales-date">WAITING&hellip;</p>
+            </div>
           </article>
-          <article class="kpi-card">
-            <h3>Overstock</h3>
-            <p class="kpi-value" id="analytics-overstock">&mdash;</p>
+          <article class="kpi-card" aria-label="Total revenue">
+            <span class="kpi-icon kpi-icon-indigo" aria-hidden="true">&#128200;</span>
+            <div>
+              <h3>Revenue</h3>
+              <p class="kpi-value" id="kpi-revenue">&mdash;</p>
+              <p class="kpi-sub" id="kpi-revenue-note">Since Nov 2025</p>
+            </div>
           </article>
-          <article class="kpi-card">
-            <h3>Slow Movers</h3>
-            <p class="kpi-value" id="analytics-slow">&mdash;</p>
+          <article class="kpi-card" aria-label="Units on hand">
+            <span class="kpi-icon kpi-icon-teal" aria-hidden="true">&#128230;</span>
+            <div>
+              <h3>Units on Hand</h3>
+              <p class="kpi-value" id="kpi-stock">&mdash;</p>
+              <p class="kpi-sub">Across 5 stores</p>
+            </div>
           </article>
-          <article class="kpi-card">
-            <h3>Sales Anomalies</h3>
-            <p class="kpi-value" id="analytics-anomalies">&mdash;</p>
+          <article class="kpi-card kpi-card-danger" aria-label="Stock out risks">
+            <span class="kpi-icon kpi-icon-red" aria-hidden="true">&#9888;&#65039;</span>
+            <div>
+              <h3>Stock-out Risks</h3>
+              <p class="kpi-value" id="kpi-risk">&mdash;</p>
+              <p class="kpi-sub">Critical or high</p>
+            </div>
+          </article>
+          <article class="kpi-card" aria-label="Attention items">
+            <span class="kpi-icon kpi-icon-amber" aria-hidden="true">&#9835;</span>
+            <div>
+              <h3>Attention Items</h3>
+              <p class="kpi-value" id="kpi-attention">&mdash;</p>
+              <p class="kpi-sub">Across every store</p>
+            </div>
           </article>
         </div>
       </section>
 
-      <section class="main-grid">
-        <div class="panel dashboard-panel">
-          <h2 class="panel-title">Sales &amp; Inventory Dashboard</h2>
-          <div class="placeholder-body">
-            Charts and tables will appear here in a future milestone.
+      <section id="analytics" class="section analytics-section" aria-labelledby="analytics-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="analytics-heading" class="section-title">Retail Intelligence</h2>
+            <p class="section-sub" id="analytics-range">Loading analytics&hellip;</p>
           </div>
         </div>
 
-        <aside class="panel copilot-panel" aria-label="Copilot">
-          <h2 class="panel-title">Copilot</h2>
-          <div class="copilot-suggestions" id="copilot-suggestions" aria-label="Example questions">
-            <button type="button" class="suggestion-chip" data-question="What needs my attention today?">
-              What needs my attention?
-            </button>
-            <button type="button" class="suggestion-chip" data-question="Which products are at risk of stock-out?">
-              Stock-out risks
-            </button>
-            <button type="button" class="suggestion-chip" data-question="What is overstocked?">
-              Overstock
-            </button>
-            <button type="button" class="suggestion-chip" data-question="Which products had a sales drop?">
-              Sales drops
-            </button>
-          </div>
-          <form class="copilot-form" id="copilot-form">
-            <input
-              type="text"
-              id="copilot-question"
-              class="copilot-input"
-              placeholder="Ask a question about your sales and inventory&hellip;"
-              maxlength="500"
-              autocomplete="off"
-            />
-            <button type="submit" id="copilot-ask" class="copilot-ask">Ask</button>
-          </form>
-          <div class="copilot-status" id="copilot-status" aria-live="polite">
-            Ready. Answers are grounded in the deterministic analytics engine.
-          </div>
-          <div class="copilot-result" id="copilot-result" hidden>
-            <div class="copilot-meta" id="copilot-meta"></div>
-            <div class="copilot-answer" id="copilot-answer"></div>
-            <div class="copilot-section">
-              <h4>Evidence used</h4>
-              <ul class="copilot-evidence" id="copilot-evidence"></ul>
+        <div class="grid">
+          <article class="panel inventory-panel">
+            <h3 class="panel-title">Inventory Health</h3>
+            <div class="health-bar" id="health-bar" aria-label="Inventory health distribution">
+              <div class="health-bar-seg health-risk" title="At risk"></div>
+              <div class="health-bar-seg health-ok" title="Healthy"></div>
             </div>
-            <div class="copilot-section">
-              <h4>Assumptions</h4>
-              <ul class="copilot-assumptions" id="copilot-assumptions"></ul>
+            <div class="health-labels">
+              <span><span class="legend-dot dot-red" aria-hidden="true"></span>At risk <b id="health-flagged">—</b></span>
+              <span><span class="legend-dot dot-green" aria-hidden="true"></span>Healthy <b id="health-ok">—</b></span>
             </div>
-          </div>
-        </aside>
+            <div class="health-grid">
+              <div class="health-card health-card-risk">
+                <span class="health-card-icon" aria-hidden="true">&#128308;</span>
+                <div>
+                  <strong id="analytics-stockout">&mdash;</strong>
+                  <span>Stock-out risk</span>
+                </div>
+              </div>
+              <div class="health-card health-card-over">
+                <span class="health-card-icon" aria-hidden="true">&#128992;</span>
+                <div>
+                  <strong id="health-overstock">&mdash;</strong>
+                  <span>Overstock</span>
+                </div>
+              </div>
+              <div class="health-card health-card-slow">
+                <span class="health-card-icon" aria-hidden="true">&#128993;</span>
+                <div>
+                  <strong id="health-slow">&mdash;</strong>
+                  <span>Slow movers</span>
+                </div>
+              </div>
+            </div>
+          </article>
 
-        <div class="panel attention-panel">
-          <h2 class="panel-title">Attention</h2>
-          <div class="placeholder-body">
-            Anomalies and recommendations will be listed here.
-          </div>
+          <article class="panel store-panel">
+            <h3 class="panel-title">Store Performance</h3>
+            <div class="store-list" id="store-list">
+              <p class="state-note">Loading store performance&hellip;</p>
+            </div>
+          </article>
+
+          <article class="panel trend-panel">
+            <div class="panel-title-row">
+              <h3 class="panel-title">Sales Trend</h3>
+              <div class="segmented" role="group" aria-label="Chart range">
+                <button type="button" class="seg-btn" data-range="30">30d</button>
+                <button type="button" class="seg-btn" data-range="90">90d</button>
+                <button type="button" class="seg-btn is-active" data-range="all">All</button>
+              </div>
+              <div class="segmented" role="group" aria-label="Chart metric">
+                <button type="button" class="seg-btn is-active" data-metric="revenue">Revenue</button>
+                <button type="button" class="seg-btn" data-metric="units">Units</button>
+              </div>
+            </div>
+            <div class="chart-wrap">
+              <svg
+                id="sales-chart"
+                class="sales-chart"
+                role="img"
+                aria-label="Sales revenue over time"
+                viewBox="0 0 800 280"
+                preserveAspectRatio="none"
+              ></svg>
+            </div>
+            <div class="chart-legend" aria-hidden="true">
+              <span class="legend-key"><i class="key-line"></i>Daily revenue</span>
+              <span class="legend-key"><i class="key-area"></i>Trend</span>
+            </div>
+          </article>
+
+          <article class="panel attention-panel">
+            <div class="panel-title-row">
+              <h3 class="panel-title">Needs Attention</h3>
+              <span class="count-badge" id="attention-count">0</span>
+            </div>
+            <div class="filter-row" role="group" aria-label="Filter attention by severity">
+              <button type="button" class="filter-chip is-active" data-sev="all">All</button>
+              <button type="button" class="filter-chip" data-sev="CRITICAL">Critical</button>
+              <button type="button" class="filter-chip" data-sev="HIGH">High</button>
+            </div>
+            <div class="attention-list" id="attention-list">
+              <p class="state-note">Loading attention items&hellip;</p>
+            </div>
+          </article>
+
+          <article class="panel products-panel">
+            <div class="panel-title-row">
+              <h3 class="panel-title">Product Performance</h3>
+              <label class="visually-hidden" for="product-category-filter">Filter products by category</label>
+              <select id="product-category-filter" class="select-control" aria-label="Filter products by category">
+                <option value="all">All categories</option>
+              </select>
+            </div>
+            <div class="table-wrap">
+              <table class="data-table" id="product-table">
+                <caption class="visually-hidden">
+                  Product performance by units sold, revenue, trend, on-hand stock and risk
+                </caption>
+                <thead>
+                  <tr>
+                    <th><button type="button" class="sort-btn" data-key="product_name">Product</button></th>
+                    <th>Category</th>
+                    <th><button type="button" class="sort-btn" data-key="units_sold">Units</button></th>
+                    <th><button type="button" class="sort-btn" data-key="revenue">Revenue</button></th>
+                    <th><button type="button" class="sort-btn" data-key="trend">Trend</button></th>
+                    <th><button type="button" class="sort-btn" data-key="stock">Stock</button></th>
+                    <th><button type="button" class="sort-btn" data-key="severity">Risk</button></th>
+                  </tr>
+                </thead>
+                <tbody id="product-tbody">
+                  <tr>
+                    <td colspan="7" class="state-note">Loading product performance&hellip;</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <p class="panel-foot" id="product-note"></p>
+          </article>
+        </div>
+
+        <div class="dataset-strip" aria-label="Dataset summary">
+          <span>Stores <b id="data-stores">&mdash;</b></span>
+          <span>Products <b id="data-products">&mdash;</b></span>
+          <span>Sales records <b id="data-sales">&mdash;</b></span>
+          <span>Inventory records <b id="data-inventory">&mdash;</b></span>
+          <span class="dataset-date">Data as of <b id="global-analysis-date">&mdash;</b></span>
         </div>
       </section>
     </main>
 
     <footer class="app-footer">
-      <p>NexusTiQ24 &middot; PS03 &middot; Foundation milestone</p>
+      <p>
+        RetailPulse AI &middot; NexusTiQ24 &middot; PS03 &middot; Two-stage pipeline:
+        deterministic analytics engine &rarr; evidence-grounded copilot.
+      </p>
     </footer>
 
+    <script src="/assets/utils.js"></script>
+    <script src="/assets/api.js"></script>
+    <script src="/assets/charts.js"></script>
+    <script src="/assets/copilot.js"></script>
+    <script src="/assets/dashboard.js"></script>
     <script src="/assets/app.js"></script>
   </body>
 </html>

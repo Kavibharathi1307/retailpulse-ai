@@ -147,3 +147,9 @@ def get_inventory(
 @router.get("/data/summary")
 def data_summary() -> dict:
     return _run(repositories.get_data_summary)
+
+
+@router.get("/data/sales-series")
+def sales_series() -> dict:
+    """Daily units + revenue totals across the full sales history (for charts)."""
+    return _run(repositories.get_sales_series)

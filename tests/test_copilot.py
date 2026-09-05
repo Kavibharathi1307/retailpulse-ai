@@ -296,10 +296,24 @@ class GroundingContractTest(unittest.TestCase):
 
 
 class SecurityTest(unittest.TestCase):
+    _FRONTEND_FILES = (
+        "frontend/index.html",
+        "frontend/assets/app.js",
+        "frontend/assets/utils.js",
+        "frontend/assets/api.js",
+        "frontend/assets/charts.js",
+        "frontend/assets/copilot.js",
+        "frontend/assets/dashboard.js",
+        "frontend/assets/styles.css",
+    )
+
+    @classmethod
+    def frontend_sources(cls) -> list[str]:
+        return [ (PROJECT_ROOT / path).read_text(encoding="utf-8") for path in cls._FRONTEND_FILES ]
+
     def test_gemini_key_not_in_frontend(self):
-        for source in ("frontend/index.html", "frontend/assets/app.js", "frontend/assets/styles.css"):
-            content = (PROJECT_ROOT / source).read_text(encoding="utf-8")
-            self.assertNotIn("GEMINI_API_KEY", content)
+        for source in self.frontend_sources():
+            self.assertNotIn("GEMINI_API_KEY", source)
 
     def test_gemini_key_never_in_responses(self):
         grounded = service_with(FakeClient("ok")).answer("What is overstocked?")
@@ -328,10 +342,13 @@ class SecurityTest(unittest.TestCase):
             )
 
     def test_frontend_renders_gemini_output_as_untrusted_text(self):
-        js = (PROJECT_ROOT / "frontend/assets/app.js").read_text(encoding="utf-8")
-        self.assertIn('answer.textContent = data.answer', js)
-        self.assertNotIn('answer.innerHTML = data.answer', js)
-        self.assertIn("addListItem", js)
+        js_sources = self.frontend_sources()
+        copilot_js = (PROJECT_ROOT / "frontend/assets/copilot.js").read_text(encoding="utf-8")
+        self.assertIn('answer.textContent = data.answer', copilot_js)
+        self.assertNotIn('answer.innerHTML = data.answer', "".join(js_sources))
+        self.assertIn("addListItem", copilot_js)
+        self.assertNotIn("innerHTML = data.answer", "".join(js_sources))
+        self.assertNotIn("insertAdjacentHTML", "".join(js_sources))
 
 
 if __name__ == "__main__":

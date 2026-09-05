@@ -12,13 +12,19 @@ questions and surfacing what needs attention.
 
 ## Current Status
 
-Current milestone: **Milestone 4 — Gemini Grounded Copilot**.
+Current milestone: **Milestone 5 — Hackathon-Winning Dashboard & UX**.
 
 Implemented:
 
 - A FastAPI backend serving the application on `http://localhost:8000`.
 - A health endpoint at `GET /api/health`.
-- A static frontend shell that reports backend status and retail data counts.
+- A polished, dependency-free SaaS-style **retail intelligence dashboard**
+  (`frontend/`) with a hero copilot panel (suggestion chips, structured,
+  evidence-first answers), KPI cards, inventory health bar, store
+  performance, an interactive SVG sales trend chart (30d / 90d / All,
+  Revenue / Units), a severity-filtered attention centre, a sortable and
+  category-filterable product table, and a dataset strip — every number is
+  fetched live from the APIs, nothing is hardcoded.
 - A **local SQLite retail data layer** (`data/retailpulse.db`) with realistic,
   deterministic sample data for stores, products, daily sales, and inventory.
 - JSON API endpoints to read stores, products, sales, and inventory.
@@ -273,6 +279,7 @@ answer or the topic is outside the retail data).
 | `GET /api/sales`             | List sales. Filters: `store_id`, `product_id`, `start_date`, `end_date`. |
 | `GET /api/inventory`         | List inventory. Filters: `store_id`, `product_id`.     |
 | `GET /api/data/summary`      | Record counts for stores, products, sales, inventory.  |
+| `GET /api/data/sales-series` | Daily units + revenue totals for the trend chart / KPIs. Filters: `store_id`, `product_id`. |
 | `GET /api/analytics/attention-summary` | Severity-sorted attention list with counts. Filters: `store_id`, `product_id`, `as_of_date`. |
 | `GET /api/analytics/stock-out-risks` | Stock-out risk per store/product. Filters: `store_id`, `product_id`, `as_of_date`. |
 | `GET /api/analytics/overstock`       | Overstock detection. Filters: `store_id`, `product_id`, `as_of_date`. |
@@ -353,6 +360,7 @@ python -m unittest tests.test_analytics -v   # analytics engine unit tests
 python tests/verify_analytics_api.py  # HTTP-level checks of the analytics APIs
 python -m unittest tests.test_copilot -v     # copilot unit tests (mocked Gemini)
 python tests/verify_copilot_api.py    # HTTP-level checks of the copilot + frontend
+python tests/verify_frontend.py       # HTTP-level checks of the M5 dashboard + truthful numbers
 ```
 
 The unit tests build a tiny synthetic retail database with controlled patterns

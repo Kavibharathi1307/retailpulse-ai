@@ -164,6 +164,41 @@ def get_sales_date_range(db_path: Path = DATABASE_PATH) -> Optional[dict]:
     return {"first_date": row["first_date"], "last_date": row["last_date"]}
 
 
+def get_sales_series(
+    db_path: Path = DATABASE_PATH,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+) -> dict:
+    """Daily sales totals (units + revenue) for trend charts and KPIs.
+
+    Aggregates the raw daily transaction history into one row per day so the
+    frontend can render a revenue/units chart and headline numbers without
+    pulling thousands of individual sale records.
+    """
+    with connect(db_path) as conn:
+        where, params = [], []
+        if store_id is not None:
+            where.append("s.store_id = ?")
+            params.append(store_id)
+        if product_id is not None:
+            where.append("s.product_id = ?")
+            params.append(product_id)
+        where_sql = f"WHERE {' AND '.join(where)}" if where else ""
+        rows = _rows(
+            conn.execute(
+                f"SELECT s.sale_date, SUM(s.quantity_sold) AS units,"
+                f" SUM(s.revenue) AS revenue FROM sales s {where_sql}"
+                f" GROUP BY s.sale_date ORDER BY s.sale_date",
+                params,
+            )
+        )
+    return {
+        "items": rows,
+        "start_date": rows[0]["sale_date"] if rows else None,
+        "end_date": rows[-1]["sale_date"] if rows else None,
+    }
+
+
 # ---------------------------------------------------------------------------
 # Inventory
 # ---------------------------------------------------------------------------
