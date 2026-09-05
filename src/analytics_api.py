@@ -483,3 +483,39 @@ def forecast_summary(
             config=DEFAULT_CONFIG,
         )
     )
+
+
+EXECUTIVE_DEFAULT_LIMIT = DEFAULT_CONFIG.executive_default_limit
+EXECUTIVE_MAX_LIMIT = DEFAULT_CONFIG.executive_max_limit
+
+
+@router.get("/executive-summary")
+def executive_summary(
+    store_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(EXECUTIVE_DEFAULT_LIMIT),
+) -> dict:
+    """Executive intelligence: health score, counts, top issues and signals.
+
+    Every number is produced deterministically by the analytics engine; the
+    endpoint only packages evidence already computed by the existing analytics.
+    """
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id=store_id)
+    if limit < 1 or limit > EXECUTIVE_MAX_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_limit",
+                "message": f"limit must be between 1 and {EXECUTIVE_MAX_LIMIT}",
+            },
+        )
+    return _run(
+        lambda: analytics_engine.executive(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            as_of_date=as_of_date,
+            limit=limit,
+            config=DEFAULT_CONFIG,
+        )
+    )

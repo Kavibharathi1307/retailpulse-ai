@@ -17,7 +17,12 @@ from src.gemini.errors import (
     GeminiTimeoutError,
 )
 from src.gemini.evidence import build_evidence
-from src.gemini.intents import INTENT_FORECAST, INTENT_UNSUPPORTED, classify_intent
+from src.gemini.intents import (
+    INTENT_EXECUTIVE,
+    INTENT_FORECAST,
+    INTENT_UNSUPPORTED,
+    classify_intent,
+)
 from src.gemini.prompts import SYSTEM_INSTRUCTION, build_user_prompt
 
 MAX_QUESTION_LENGTH = 500
@@ -220,6 +225,43 @@ class CopilotService:
                     f"{value.get('slow_movers', 0)} slow movers, "
                     f"{value.get('sales_spikes', 0)} spikes, "
                     f"{value.get('sales_drops', 0)} drops)."
+                )
+        elif intent == "executive":
+            summary = next((e for e in evidence if e.get("type") == "EXECUTIVE_SUMMARY"), None)
+            if summary and summary.get("value"):
+                value = summary["value"]
+                top = max(
+                    summary["value"].get("components", []),
+                    key=lambda c: c.get("penalty", 0),
+                    default=None,
+                )
+                extra = ""
+                if top and top.get("penalty"):
+                    extra = f"; largest penalty is {top.get('label', '')}"
+                lines.append(
+                    f"  Retail health: {value.get('health_score')}/100 "
+                    f"({value.get('health_status')}) as of {analysis_date}{extra}."
+                )
+                lines.append(
+                    f"  Position: {value.get('total_stores')} stores, "
+                    f"{value.get('total_products')} products, "
+                    f"{value.get('total_revenue'):,.0f} in revenue, "
+                    f"{value.get('total_units'):,} units sold."
+                )
+                lines.append(
+                    f"  Issues: {value.get('top_issue_count')} top issue(s); "
+                    f"{value.get('critical_issue_count')} critical, "
+                    f"{value.get('high_issue_count')} high; "
+                    f"{value.get('recommendation_count')} recommendation(s); "
+                    f"{value.get('forecast_at_risk_count')} forecast at risk."
+                )
+                lines.append(
+                    f"  Signals: {value.get('opportunity_count')} growth signal(s), "
+                    f"{value.get('decline_count')} declining signal(s); "
+                    f"{value.get('stockout_risk_count')} stock-out risk, "
+                    f"{value.get('overstock_count')} overstock, "
+                    f"{value.get('slow_mover_count')} slow mover, "
+                    f"{value.get('anomaly_count')} anomaly count."
                 )
 
         for item in evidence[:5]:

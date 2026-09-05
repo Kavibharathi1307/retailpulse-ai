@@ -12,7 +12,7 @@ questions and surfacing what needs attention.
 
 ## Current Status
 
-Current milestone: **Milestone 7 — Explainable Demand Forecasting**.
+Current milestone: **Milestone 8 — Executive Retail Intelligence**.
 
 Implemented:
 
@@ -35,9 +35,12 @@ Implemented:
   spike/drop detection, product and store performance, **actionable
   recommended actions**, **explainable demand forecasting** for 7/14/30-day
   horizons, plus a severity-sorted attention summary with explicit evidence
-  for every finding.
+  for every finding, and an **Executive Overview** with a transparent
+  0–100 Retail Health score, top issues, growth opportunities and declining
+  signals.
 - Analytics API endpoints under `/api/analytics` including
-  `/api/analytics/forecast` and `/api/analytics/forecast-summary`.
+  `/api/analytics/forecast`, `/api/analytics/forecast-summary`, and
+  `/api/analytics/executive-summary`.
 - A **grounded natural-language copilot** (`src/gemini/` + `/api/copilot/query`)
   that answers retail questions with Google Gemini, where Gemini may only use
   evidence produced by the deterministic analytics engine — including
@@ -320,6 +323,47 @@ empty.
 with a dashed expected-demand forecast and "Forecast" divider, and a table of
 per-product expected demand, trend and inventory outlook.
 
+## Executive Intelligence (Milestone 8)
+
+`src/analytics/executive.py` is a pure, deterministic executive layer exposed
+through the engine and `GET /api/analytics/executive-summary`. It turns the
+engine's findings into a single explainable **Retail Health score** plus
+ranked, action-oriented top issues, growth opportunities and declining
+signals — with no Gemini involvement in the calculation.
+
+**Retail Health score.** On a 0–100 scale, starting from 100, five domains
+each remove a bounded penalty. A domain's penalty is `min(1.0, weighted
+severity count / positions) × 20`, added across domains and rounded to an
+integer (floor 0). Weights live in `src/analytics/config.py`: CRITICAL items
+weigh 3.0, HIGH 1.5, MEDIUM 0.75; forecast `AT_RISK` 3.0 and `WATCH` 1.0;
+overstock and slow movers 1.5; sales spikes 1.0 and drops 2.0. `positions` is
+the number of store/product inventory records in scope (180 for the whole
+portfolio, 36 for a single store).
+
+**Status bands.** `EXCELLENT` ≥ 85, `HEALTHY` ≥ 70, `WATCH` ≥ 55,
+`AT_RISK` ≥ 40, `CRITICAL` < 40. Each response includes the score, band,
+denominator, the exact formula, the thresholds, and a per-domain breakdown so
+every point removed is accountable.
+
+**Ranked lists.** Top issues come from the engine's recommended actions with
+`LOW` priority filtered out, preserving their CRITICAL-first / HIGH / MEDIUM
+order. Growth opportunities combine forecast `UP` trends with sales-spike
+anomalies; declining signals combine forecast `DOWN` trends, sales drops and
+slow movers — each ranked by recent daily demand. No position appears twice in
+a list, and every entry carries a plain-text reason and recommended action.
+
+**Grounding.** The copilot's `executive` intent (`How healthy is the
+business?`, `What are the biggest problems?`, …) streams the exact engine
+output as `EXECUTIVE_SUMMARY`, `EXECUTIVE_ISSUE`, `EXECUTIVE_OPPORTUNITY` and
+`EXECUTIVE_DECLINE` FACT/ESTIMATE evidence; Gemini only rephrases it and is
+forbidden from rescoring or adding financial figures (the dataset has no cost
+data, so profit/margin/savings/ROI are never reported).
+
+**Dashboard.** The Executive Overview section shows the big health score with
+its status band, the score formula and five per-domain penalties, portfolio
+KPIs, and three panels for top priority actions, growth signals and declining
+signals.
+
 ## API Endpoints
 
 | Endpoint                     | Description                                            |
@@ -341,6 +385,7 @@ per-product expected demand, trend and inventory outlook.
 | `GET /api/analytics/recommendations`     | Actionable recommended actions. Filters: `store_id`, `product_id`, `as_of_date`. |
 | `GET /api/analytics/forecast`            | Per store/product expected demand. Filters: `store_id`, `product_id`, `as_of_date`, `horizon_days` (7/14/30). |
 | `GET /api/analytics/forecast-summary`    | Portfolio demand totals. Filters: `store_id`, `product_id`, `as_of_date`, `horizon_days` (7/14/30). |
+| `GET /api/analytics/executive-summary`   | Retail Health score, ranked issues/opportunities/declines. Filters: `store_id`, `product_id`, `as_of_date`, `limit` (1–20, default 5). |
 | `POST /api/copilot/query` | Natural-language retail query. Body: `{ "question": "..." }`. Returns the grounded answer, intent, evidence, assumptions, data status, and AI status. |
 
 Data endpoints return `{items, total, limit, offset}`. Analytics list endpoints
@@ -378,8 +423,9 @@ a real API key to the repository.
   split into `config.py` (all thresholds), `data.py` (all SQL reads),
   `metrics.py` (shared numeric helpers), and one module per category
   (`performance.py`, `stock.py`, `velocity.py`, `anomalies.py`,
-  `attention.py`, `recommendations.py`, `forecast.py`) orchestrated by
-  `engine.py` and exposed by `src/analytics_api.py`. Calculation modules never
+  `attention.py`, `recommendations.py`, `forecast.py`, `executive.py`)
+  orchestrated by `engine.py` and exposed by `src/analytics_api.py`.
+  Calculation modules never
   touch the database; SQL lives only in `data.py`. The `attention` module
   emits the evidence the copilot relies on.
 - **Grounded copilot** — `src/gemini/` holds the no-AI routing glue:

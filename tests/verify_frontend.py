@@ -111,7 +111,7 @@ def main() -> int:
     # ---- Copilot hero ------------------------------------------------------
     check("copilot hero present",
           'id="copilot-form"' in html and 'id="copilot-question"' in html and 'id="copilot-ask"' in html)
-    check("six suggestion chips shipped", html.count('class="suggestion-chip"') == 6)
+    check("seven suggestion chips shipped", html.count('class="suggestion-chip"') == 7)
     check("copilot answer/evidence/assumptions containers present",
           'id="copilot-answer"' in html and 'id="copilot-evidence"' in html
           and 'id="copilot-assumptions"' in html and 'id="copilot-result"' in html)
@@ -130,8 +130,15 @@ def main() -> int:
         "data-stores", "data-products", "data-sales", "data-inventory", "global-analysis-date",
         "outlook-chart", "outlook-tbody", "outlook-rising", "outlook-falling",
         "outlook-at-risk", "outlook-watch", "outlook-thin", "outlook-note", "outlook-count",
+        "executive", "exec-health-score", "exec-health-status", "exec-health-explanation",
+        "exec-health-formula", "exec-health-components", "exec-revenue", "exec-units",
+        "exec-critical", "exec-recommendations", "exec-forecast-at-risk",
+        "exec-top-issues", "exec-growth", "exec-decline",
+        "exec-top-count", "exec-growth-count", "exec-decline-count", "executive-note",
     ):
         check(f"dashboard element id={element_id}", f'id="{element_id}"' in html)
+    check("executive section labelled in the page",
+          "Executive Overview" in html and "How is this score calculated?" in html)
 
     # ---- Truthful numbers: every value must come from a real endpoint ------
     status, summary = get_json("/api/data/summary")
@@ -195,6 +202,28 @@ def main() -> int:
 
     status, health = get_json("/api/health")
     check("health endpoint intact", status == 200 and health["track"] == "PS03")
+
+    # ---- Executive Overview (Milestone 8): numbers come from the engine ----
+    status, executive = get_json("/api/analytics/executive-summary")
+    check("executive-summary served",
+          status == 200 and isinstance(executive["health"]["score"], int)
+          and executive["health"]["status"] in ("EXCELLENT", "HEALTHY", "WATCH", "AT_RISK", "CRITICAL"))
+    check("executive analysis date is the dataset analysis date",
+          executive["analysis_date"] == summary["last_date"])
+    check("executive top lists have engine-grounded rows",
+          all("product" in row and "store" in row
+              and ("short_reason" in row or "reason" in row) for row in executive["top_issues"])
+          and len(executive["top_opportunities"]) > 0
+          and len(executive["top_declines"]) > 0)
+
+    status, dash_js = request("/assets/dashboard.js")
+    check("dashboard.js renders the executive summary",
+          "renderExecutive" in dash_js
+          and "/api/analytics/executive-summary" in dash_js
+          and "exec-health-score" in dash_js)
+    check("executive data rendered via textContent",
+          "statusEl.textContent = health.status" in dash_js
+          and "container.textContent = \"\"" in dash_js)
 
     # ---- Copilot path (Gemini swapped for a fake, no network) --------------
     fake = FakeClient()

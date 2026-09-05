@@ -8,6 +8,7 @@ and carries the evidence used to make it.
 from src.analytics.config import AnalyticsConfig, DEFAULT_CONFIG
 from src.analytics.engine import (
     attention_summary,
+    executive,
     forecast,
     forecast_summary,
     overstock,
@@ -23,6 +24,7 @@ __all__ = [
     "AnalyticsConfig",
     "DEFAULT_CONFIG",
     "attention_summary",
+    "executive",
     "forecast",
     "forecast_summary",
     "overstock",

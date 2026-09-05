@@ -19,6 +19,7 @@ INTENT_FORECAST = "forecast"
 INTENT_PRODUCT = "product_performance"
 INTENT_STORE = "store_performance"
 INTENT_ATTENTION = "attention"
+INTENT_EXECUTIVE = "executive"
 INTENT_UNSUPPORTED = "unsupported"
 
 MAX_PRODUCT_ID = 1000
@@ -49,6 +50,32 @@ OFF_TOPIC_MARKERS = (
 
 # Priority-ordered (most specific first). Only the first match wins.
 _KEYWORD_RULES = [
+    # Executive (Milestone 8) is the most general "tell me the big picture"
+    # intent, so its phrases are checked before category-specific rules. A
+    # question like "which products are declining" becomes an executive signal,
+    # while "what is declining in sales" still routes to the sales-drop intent.
+    (INTENT_EXECUTIVE, (
+        "what should i focus on",
+        "where should i take action",
+        "where to take action",
+        "what are the biggest problems",
+        "biggest problems",
+        "top opportunities",
+        "which products are declining",
+        "products are declining",
+        "overall retail health",
+        "retail health",
+        "how healthy",
+        "executive summary",
+        "executive overview",
+        "give me an executive",
+        "summarize the",
+        "what needs attention",
+        "health score",
+        "how is the business doing",
+        "current retail situation",
+        "overview of the",
+    )),
     (INTENT_REORDER, (
         "reorder", "re order", "re-order", "restock", "replenish", "order more",
         "should i order", "buy more", "re stock",

@@ -45,6 +45,12 @@ GROUNDING RULES (non-negotiable):
     present them as guaranteed future sales. If the evidence contains only
     INSUFFICIENT_DATA for a demand-forecast question, answer:
     "Insufficient historical data for a reliable forecast."
+14. EXECUTIVE health evidence (the 0-100 Retail Health score, its status band,
+    penalty components, every count, and the top issues/opportunities/declines)
+    is FACT produced by RetailPulse's deterministic scoring engine. Report it
+    exactly as supplied. Never recalculate or re-interpret the score, and never
+    add profitability, margin, cost, savings, or ROI figures: no financial data
+    of that kind exists in the evidence.
 
 TONE: concise, plain English for a busy store manager. Use bullet lists when
 listing multiple items. Quote product names, store names, categories, and

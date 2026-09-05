@@ -827,6 +827,150 @@ function wireOutlookControls() {
 
 // --- Boot -----------------------------------------------------------------
 
+function statusPillClass(status) {
+  return "exec-status-pill status-" + String(status == null ? "" : status).toLowerCase();
+}
+
+function renderHealthComponents(components, denominator) {
+  const list = document.getElementById("exec-health-components");
+  if (!list) {
+    return;
+  }
+  list.textContent = "";
+  if (!Array.isArray(components) || components.length === 0) {
+    list.appendChild(stateNote("No scoring components available.", "state-warn"));
+    return;
+  }
+  components.forEach((component) => {
+    const row = document.createElement("div");
+    row.className = "exec-component";
+    const label = document.createElement("span");
+    label.className = "exec-component-label";
+    label.textContent = component.label;
+    const amount = document.createElement("span");
+    amount.className = "exec-component-amount";
+    amount.textContent = `${component.count} affected \u00b7 penalty ${component.penalty != null ? Number(component.penalty).toFixed(2) : "\u2014"} pts`;
+    row.append(label, amount);
+    list.appendChild(row);
+  });
+}
+
+function execIssueCard(issue) {
+  const article = document.createElement("article");
+  article.className = "exec-item";
+  const head = document.createElement("div");
+  head.className = "exec-item-head";
+  const priorityClass = issue.priority === "CRITICAL" ? "risk-critical" : issue.priority === "HIGH" ? "risk-high" : "risk-medium";
+  head.appendChild(pillElement(issue.priority || "MEDIUM", priorityClass));
+  head.appendChild(Object.assign(document.createElement("span"), {
+    className: "exec-item-type",
+    textContent: issue.issue_type || issue.recommendation_type || "Issue",
+  }));
+  article.appendChild(head);
+  article.appendChild(Object.assign(document.createElement("h4"), {
+    className: "exec-item-title",
+    textContent: `${issue.product || "Item"} \u00b7 ${issue.store || "All stores"}`,
+  }));
+  article.appendChild(Object.assign(document.createElement("p"), {
+    className: "exec-item-text",
+    textContent: `Why it matters: ${issue.short_reason || issue.reason || "See evidence."}`,
+  }));
+  article.appendChild(Object.assign(document.createElement("p"), {
+    className: "exec-item-action",
+    textContent: `Action type: ${issue.recommendation_type || issue.issue_type || "\u2014"}`,
+  }));
+  article.appendChild(Object.assign(document.createElement("p"), {
+    className: "exec-item-action",
+    textContent: `Action: ${issue.recommended_action || "Review."}`,
+  }));
+  return article;
+}
+
+function execSignalCard(signal, positive) {
+  const article = document.createElement("article");
+  article.className = "exec-item";
+  const head = document.createElement("div");
+  head.className = "exec-item-head";
+  head.appendChild(pillElement(signal.signal || (positive ? "Growth" : "Decline"), positive ? "trend-ok" : "trend-danger"));
+  article.appendChild(head);
+  article.appendChild(Object.assign(document.createElement("h4"), {
+    className: "exec-item-title",
+    textContent: `${signal.product || "Item"} \u00b7 ${signal.store || "All stores"}`,
+  }));
+  article.appendChild(Object.assign(document.createElement("p"), {
+    className: "exec-item-text",
+    textContent: signal.reason
+      ? signal.reason
+      : `${signal.metric || "metric"}: ${signal.value == null ? "\u2014" : Number(signal.value).toFixed(1)}`,
+  }));
+  article.appendChild(Object.assign(document.createElement("p"), {
+    className: "exec-item-action",
+    textContent: `Recommended: ${signal.recommended_action || "Review."}`,
+  }));
+  return article;
+}
+
+function renderExecList(containerId, items, builder) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+  container.textContent = "";
+  if (!Array.isArray(items) || items.length === 0) {
+    container.appendChild(stateNote("No records in the current scope.", "state-warn"));
+    return;
+  }
+  items.forEach((item) => container.appendChild(builder(item)));
+}
+
+function renderExecutive(summary) {
+  const set = (id, value, fallback) => {
+    const elNode = document.getElementById(id);
+    if (elNode) {
+      elNode.textContent = value === null || value === undefined ? (fallback || "\u2014") : value;
+    }
+  };
+  const note = document.getElementById("executive-note");
+  if (!summary) {
+    set("exec-health-score", null, "\u2014");
+    set("exec-health-status", "\u00b7\u00b7\u00b7", null);
+    if (note) {
+      note.textContent = "Executive intelligence is temporarily unavailable.";
+    }
+    return;
+  }
+  const health = summary.health || {};
+  const counts = summary.counts || {};
+
+  set("exec-health-score", health.score == null ? "\u2014" : health.score, "\u2014");
+  const statusEl = document.getElementById("exec-health-status");
+  if (statusEl) {
+    statusEl.className = statusPillClass(health.status);
+    statusEl.textContent = health.status || "\u00b7\u00b7\u00b7";
+  }
+  set("exec-health-explanation", health.summary || "", "\u2014");
+  set("exec-health-formula", health.formula || "", "");
+  renderHealthComponents(health.components, health.denominator);
+
+  set("exec-revenue", formatMoney(counts.total_revenue), "\u2014");
+  set("exec-units", formatNumber(counts.total_units), "\u2014");
+  set("exec-critical", formatNumber(counts.critical_issue_count), "\u2014");
+  set("exec-recommendations", formatNumber(counts.recommendation_count), "\u2014");
+  set("exec-forecast-at-risk", formatNumber(counts.forecast_at_risk_count), "\u2014");
+
+  set("exec-top-count", formatNumber((summary.top_issues || []).length), "0");
+  set("exec-growth-count", formatNumber((summary.top_opportunities || []).length), "0");
+  set("exec-decline-count", formatNumber((summary.top_declines || []).length), "0");
+
+  renderExecList("exec-top-issues", summary.top_issues, execIssueCard);
+  renderExecList("exec-growth", summary.top_opportunities, (signal) => execSignalCard(signal, true));
+  renderExecList("exec-decline", summary.top_declines, (signal) => execSignalCard(signal, false));
+
+  if (note) {
+    note.textContent = `Executive overview computed as of ${formatDateLabel(summary.analysis_date)} \u00b7 deterministic score with fully transparent penalties`;
+  }
+}
+
 function renderDatasetStrip(summary, attention, series) {
   const ids = ["data-stores", "data-products", "data-sales", "data-inventory"];
   const keys = ["stores", "products", "sales", "inventory"];
@@ -858,9 +1002,10 @@ async function bootDashboard() {
     prefer("/api/analytics/product-performance?limit=1000"),
     prefer("/api/analytics/store-performance?limit=1000"),
     prefer("/api/analytics/recommendations?limit=20"),
+    prefer("/api/analytics/executive-summary"),
   ]);
 
-  const [health, summary, series, inventory, stockout, overstock, slow, attention, products, stores, recommendations] = results;
+  const [health, summary, series, inventory, stockout, overstock, slow, attention, products, stores, recommendations, executive] = results;
 
   const seriesItems = Array.isArray(series && series.items)
     ? series.items.map((day) => ({
@@ -872,6 +1017,7 @@ async function bootDashboard() {
 
   renderStatus(health);
   renderKpis(seriesItems, inventory, stockout, attention, summary);
+  renderExecutive(executive);
   renderInventoryHealth(stockout, overstock, slow, inventory);
   renderStores(stores, stockout);
   renderAttention(attention);

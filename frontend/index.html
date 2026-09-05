@@ -80,6 +80,9 @@
           <button type="button" class="suggestion-chip" data-question="What demand should I expect next week?">
             What demand should I expect next week?
           </button>
+          <button type="button" class="suggestion-chip" data-question="How healthy is the business?">
+            How healthy is the business?
+          </button>
         </div>
 
         <form class="copilot-form" id="copilot-form">
@@ -125,6 +128,86 @@
             <div class="status-badge" id="copilot-data-status"></div>
             <div class="status-badge" id="copilot-ai-status"></div>
           </section>
+        </div>
+      </section>
+
+      <section id="executive" class="section executive-section" aria-labelledby="executive-heading">
+        <div class="section-head">
+          <div>
+            <h2 id="executive-heading" class="section-title">Executive Overview</h2>
+            <p class="section-sub" id="executive-note">Loading executive intelligence&hellip;</p>
+          </div>
+        </div>
+
+        <div class="exec-health-row">
+          <article class="exec-health-card" aria-label="Retail health score">
+            <h3 class="panel-title">Retail Health</h3>
+            <div class="exec-health-score">
+              <strong id="exec-health-score">&mdash;</strong>
+              <span id="exec-health-status" class="exec-status-pill">&hellip;</span>
+            </div>
+            <p class="exec-health-explanation" id="exec-health-explanation">Loading&hellip;</p>
+            <details class="exec-health-details">
+              <summary>How is this score calculated?</summary>
+              <p id="exec-health-formula" class="exec-formula"></p>
+              <div class="exec-component-list" id="exec-health-components"></div>
+            </details>
+          </article>
+
+          <article class="exec-metrics-card" aria-label="Executive key figures">
+            <div class="exec-metric">
+              <span>Revenue</span>
+              <strong id="exec-revenue">&mdash;</strong>
+            </div>
+            <div class="exec-metric">
+              <span>Units Sold</span>
+              <strong id="exec-units">&mdash;</strong>
+            </div>
+            <div class="exec-metric">
+              <span>Critical Issues</span>
+              <strong id="exec-critical">&mdash;</strong>
+            </div>
+            <div class="exec-metric">
+              <span>Recommendations</span>
+              <strong id="exec-recommendations">&mdash;</strong>
+            </div>
+            <div class="exec-metric">
+              <span>Forecast at Risk</span>
+              <strong id="exec-forecast-at-risk">&mdash;</strong>
+            </div>
+          </article>
+        </div>
+
+        <div class="grid exec-row">
+          <article class="panel exec-panel" aria-labelledby="exec-top-heading">
+            <div class="panel-title-row">
+              <h3 id="exec-top-heading" class="panel-title">Top Priorities</h3>
+              <span class="count-badge" id="exec-top-count">0</span>
+            </div>
+            <div class="exec-list" id="exec-top-issues">
+              <p class="state-note">Loading priorities&hellip;</p>
+            </div>
+          </article>
+
+          <article class="panel exec-panel" aria-labelledby="exec-growth-heading">
+            <div class="panel-title-row">
+              <h3 id="exec-growth-heading" class="panel-title">Growth Signals</h3>
+              <span class="count-badge" id="exec-growth-count">0</span>
+            </div>
+            <div class="exec-list" id="exec-growth">
+              <p class="state-note">Loading growth signals&hellip;</p>
+            </div>
+          </article>
+
+          <article class="panel exec-panel" aria-labelledby="exec-decline-heading">
+            <div class="panel-title-row">
+              <h3 id="exec-decline-heading" class="panel-title">Declining Signals</h3>
+              <span class="count-badge" id="exec-decline-count">0</span>
+            </div>
+            <div class="exec-list" id="exec-decline">
+              <p class="state-note">Loading declining signals&hellip;</p>
+            </div>
+          </article>
         </div>
       </section>
 

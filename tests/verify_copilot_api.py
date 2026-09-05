@@ -148,6 +148,27 @@ def main() -> int:
     check("spike intent routed", status == 200 and body["intent"] == "spike")
     check("spike evidence present", any(e["type"] == "SALES_SPIKE" for e in body["evidence"]))
 
+    # Executive intent reaches the executive evidence pipeline (Milestone 8)
+    status, raw = post_json("/api/copilot/query", {"question": "How healthy is the business?"})
+    body = json.loads(raw)
+    check("executive intent routed", status == 200 and body["intent"] == "executive")
+    check("executive summary evidence present",
+          any(e["type"] == "EXECUTIVE_SUMMARY" for e in body["evidence"])
+          and any(e["type"] == "EXECUTIVE_ISSUE" for e in body["evidence"])
+          and any(e["type"] == "EXECUTIVE_OPPORTUNITY" for e in body["evidence"])
+          and any(e["type"] == "EXECUTIVE_DECLINE" for e in body["evidence"]))
+    exec_summary_ev = next(e for e in body["evidence"] if e["type"] == "EXECUTIVE_SUMMARY")
+    check("executive evidence carries engine facts",
+          isinstance(exec_summary_ev["value"]["health_score"], int)
+          and exec_summary_ev["value"]["health_status"] in
+          ("EXCELLENT", "HEALTHY", "WATCH", "AT_RISK", "CRITICAL")
+          and exec_summary_ev["value"]["total_stores"] == 5)
+    check("executive discloses profitability cannot be assessed",
+          "Profitability cannot be assessed" in raw)
+    low = raw.lower()
+    check("executive never fabricates financial figures",
+          "profit of" not in low and "margin of" not in low and " roi" not in low)
+
     # Determinism for identical input
     status, raw_a = post_json("/api/copilot/query", {"question": "What is overstocked?"})
     status, raw_b = post_json("/api/copilot/query", {"question": "What is overstocked?"})

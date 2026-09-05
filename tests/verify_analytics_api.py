@@ -194,6 +194,58 @@ def main() -> int:
     _, fd2 = get("/api/analytics/forecast?limit=50")
     check("forecast responses are deterministic", fd1 == fd2)
 
+    # --- executive intelligence (Milestone 8) ------------------------------
+    def keys_of(obj):
+        found = set()
+        stack = [obj]
+        while stack:
+            item = stack.pop()
+            if isinstance(item, dict):
+                found.update(str(key).lower() for key in item)
+                stack.extend(item.values())
+            elif isinstance(item, list):
+                stack.extend(item)
+        return found
+
+    status, execsum = get("/api/analytics/executive-summary")
+    check("GET /api/analytics/executive-summary works", status == 200)
+    check("executive reports the analysis date",
+          execsum["analysis_date"] == "2026-01-31")
+    check("executive health score is an int with a status band",
+          isinstance(execsum["health"]["score"], int)
+          and execsum["health"]["status"] in ("EXCELLENT", "HEALTHY", "WATCH", "AT_RISK", "CRITICAL"))
+    check("executive health components explain the score",
+          len(execsum["health"]["components"]) == 5
+          and execsum["health"]["denominator"] == 180)
+    check("executive counts match engine reality",
+          execsum["counts"]["total_stores"] == 5
+          and execsum["counts"]["stockout_risk_count"] == 50
+          and execsum["counts"]["recommendation_count"] == 106)
+    check("executive top lists are populated",
+          len(execsum["top_issues"]) > 0
+          and len(execsum["top_opportunities"]) > 0
+          and len(execsum["top_declines"]) > 0)
+    check("executive top issue is CRITICAL first",
+          execsum["top_issues"][0]["priority"] == "CRITICAL")
+    check("executive inventory snapshot present",
+          execsum["inventory_snapshot"]["total_inventory_records"] == 180)
+    check("executive never fabricates financial metrics",
+          keys_of(execsum).isdisjoint({"profit", "margin", "savings", "roi", "monetary"}))
+
+    status, exs2 = get("/api/analytics/executive-summary?store_id=2")
+    check("executive filtered by store", status == 200
+          and exs2["counts"]["total_stores"] == 1
+          and exs2["health"]["denominator"] == 36)
+    status, exlim = get("/api/analytics/executive-summary?limit=2")
+    check("executive limit bounds top lists",
+          status == 200 and len(exlim["top_issues"]) == 2)
+    expect_status("/api/analytics/executive-summary?store_id=999", 404)
+    expect_status("/api/analytics/executive-summary?limit=0", 400)
+    expect_status("/api/analytics/executive-summary?limit=21", 400)
+    _, execut1 = get("/api/analytics/executive-summary")
+    _, execut2 = get("/api/analytics/executive-summary")
+    check("executive responses are deterministic", execut1 == execut2)
+
     # --- determinism over HTTP ---------------------------------------------
     _, d1 = get("/api/analytics/stock-out-risks?limit=100")
     _, d2 = get("/api/analytics/stock-out-risks?limit=100")

@@ -329,6 +329,108 @@ def build_evidence(
                 })
             )
 
+    elif intent == "executive":
+        result = analytics_engine.executive(
+            db_path=db_path, store_id=store_id, product_id=product_id,
+            as_of_date=as_of_date, limit=limit, config=config,
+        )
+        health = result["health"]
+        counts = result["counts"]
+        evidence.append(
+            _compact({
+                "type": "EXECUTIVE_SUMMARY",
+                "category": "FACT",
+                "metric": "retail_health",
+                "value": {
+                    "health_score": health["score"],
+                    "health_status": health["status"],
+                    "denominator": health["denominator"],
+                    "components": [
+                        {
+                            "key": c["key"],
+                            "label": c["label"],
+                            "penalty": c["penalty"],
+                            "count": c["count"],
+                        }
+                        for c in health["components"]
+                    ],
+                    "total_stores": counts["total_stores"],
+                    "total_products": counts["total_products"],
+                    "total_revenue": counts["total_revenue"],
+                    "total_units": counts["total_units"],
+                    "critical_issue_count": counts["critical_issue_count"],
+                    "high_issue_count": counts["high_issue_count"],
+                    "recommendation_count": counts["recommendation_count"],
+                    "forecast_at_risk_count": counts["forecast_at_risk_count"],
+                    "rising_product_count": counts["rising_product_count"],
+                    "declining_product_count": counts["declining_product_count"],
+                    "stockout_risk_count": counts["stockout_risk_count"],
+                    "overstock_count": counts["overstock_count"],
+                    "slow_mover_count": counts["slow_mover_count"],
+                    "anomaly_count": counts["anomaly_count"],
+                    "top_issue_count": len(result["top_issues"]),
+                    "opportunity_count": len(result["top_opportunities"]),
+                    "decline_count": len(result["top_declines"]),
+                },
+                "analysis_date": result["analysis_date"],
+            })
+        )
+        for issue in result["top_issues"][: min(3, limit)]:
+            evidence.append(
+                _compact({
+                    "type": "EXECUTIVE_ISSUE",
+                    "category": "FACT",
+                    "severity": issue.get("priority"),
+                    "store_id": issue.get("store_id"),
+                    "store_name": issue.get("store"),
+                    "product_id": issue.get("product_id"),
+                    "product_name": issue.get("product"),
+                    "issue_type": issue.get("issue_type"),
+                    "metric": "priority",
+                    "value": issue.get("priority"),
+                    "short_reason": issue.get("short_reason"),
+                    "recommended_action": issue.get("recommended_action"),
+                    "analysis_date": result["analysis_date"],
+                    "data_status": issue.get("data_status"),
+                })
+            )
+        for opp in result["top_opportunities"][:2]:
+            evidence.append(
+                _compact({
+                    "type": "EXECUTIVE_OPPORTUNITY",
+                    "category": "ESTIMATE",
+                    "store_id": opp.get("store_id"),
+                    "store_name": opp.get("store"),
+                    "product_id": opp.get("product_id"),
+                    "product_name": opp.get("product"),
+                    "signal": opp.get("signal"),
+                    "metric": opp.get("metric"),
+                    "value": opp.get("value"),
+                    "change_pct": opp.get("change_pct"),
+                    "trend": opp.get("trend"),
+                    "analysis_date": result["analysis_date"],
+                    "data_status": opp.get("data_status"),
+                })
+            )
+        for dec in result["top_declines"][:2]:
+            evidence.append(
+                _compact({
+                    "type": "EXECUTIVE_DECLINE",
+                    "category": "ESTIMATE",
+                    "store_id": dec.get("store_id"),
+                    "store_name": dec.get("store"),
+                    "product_id": dec.get("product_id"),
+                    "product_name": dec.get("product"),
+                    "signal": dec.get("signal"),
+                    "metric": dec.get("metric"),
+                    "value": dec.get("value"),
+                    "change_pct": dec.get("change_pct"),
+                    "trend": dec.get("trend"),
+                    "analysis_date": result["analysis_date"],
+                    "data_status": dec.get("data_status"),
+                })
+            )
+
     analysis_date = next(
         (item["analysis_date"] for item in evidence if item.get("analysis_date")),
         None,

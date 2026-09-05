@@ -302,3 +302,88 @@ def forecast_summary(
         "expected_horizon_units": outlook["expected_horizon_units"],
         "forecastable_total": outlook["forecastable_total"],
     }
+
+
+def executive(
+    db_path: Path = data.DATABASE_PATH,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    as_of_date: Optional[date] = None,
+    limit: int = DEFAULT_CONFIG.executive_default_limit,
+    config: AnalyticsConfig = DEFAULT_CONFIG,
+) -> dict:
+    """Deterministic executive intelligence (Milestone 8).
+
+    Re-packages the engine's existing outputs (stock-out, overstock, slow
+    movers, anomalies, attention, recommendations, forecasts, store/product
+    performance) into an explainable health score and ranked decision lists.
+    Every number is produced by the deterministic engine; nothing is invented
+    here. The recommendations module is imported lazily to avoid a circular
+    import (recommendations.py imports this engine module at import time).
+    """
+    import src.analytics.executive as executive_module
+    from src.analytics.recommendations import recommendations as recommendations_module
+
+    analysis_date = data.resolve_analysis_date(as_of_date, db_path)
+    horizon = config.executive_forecast_horizon_days
+
+    inventory = data.load_inventory(db_path, store_id=store_id, product_id=product_id)
+    positions = len(inventory)
+    total_products = len({inv["product_id"] for inv in inventory})
+
+    recommendations_result = recommendations_module(
+        db_path, store_id, product_id, analysis_date, config,
+    )
+    stock_rows = stockout_risks(
+        db_path, store_id, product_id, analysis_date, config,
+    )["items"]
+    overs_rows = overstock(
+        db_path, store_id, product_id, analysis_date, config,
+    )["items"]
+    slow_rows = slow_movers(
+        db_path, store_id, product_id, analysis_date, config,
+    )["items"]
+    anomaly_rows = sales_anomalies(
+        db_path, store_id, product_id, analysis_date, None, None, config,
+    )["items"]
+    attention_items = attention_summary(
+        db_path, store_id, product_id, analysis_date, config,
+    )["items"]
+    forecast_result = forecast(
+        db_path, store_id, product_id, analysis_date, horizon, config,
+    )
+    forecast_summary_result = forecast_summary(
+        db_path, store_id, product_id, analysis_date, horizon, config,
+    )
+    store_rows = store_performance(
+        db_path=db_path, store_id=store_id, as_of_date=analysis_date,
+        config=config,
+    )["items"]
+
+    total_revenue = sum(row.get("revenue") or 0 for row in store_rows)
+    total_units = sum(row.get("units_sold") or 0 for row in store_rows)
+
+    return executive_module.build_summary(
+        analysis_date=analysis_date.isoformat(),
+        horizon_days=horizon,
+        positions=positions,
+        total_stores=len(store_rows),
+        total_products=total_products,
+        total_revenue=total_revenue,
+        total_units=total_units,
+        stockout_rows=stock_rows,
+        overstock_rows=overs_rows,
+        slow_rows=slow_rows,
+        anomaly_rows=anomaly_rows,
+        attention_items=attention_items,
+        recommendation_items=recommendations_result["items"],
+        recommendation_counts=recommendations_result["counts"],
+        forecast_items=forecast_result["items"],
+        forecast_counts=forecast_result["counts"],
+        forecast_status=forecast_summary_result["forecast_status"],
+        expected_daily_demand=forecast_summary_result["expected_daily_demand"],
+        expected_horizon_units=forecast_summary_result["expected_horizon_units"],
+        forecast_method=forecast_summary_result["method"],
+        config=config,
+        limit=limit,
+    )

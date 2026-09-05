@@ -94,5 +94,45 @@ class AnalyticsConfig:
     # Minimum number of days in a window before an average is trusted.
     min_history_days: int = 7
 
+    # --- executive health score (Milestone 8) ------------------------------
+    # The health score is 100 minus a penalty budget shared by five operational
+    # domains (stock-out, forecast risk, overstock, slow movers, anomalies).
+    # Each domain can remove at most health_domain_max_penalty points:
+    #
+    #   weighted_count = sum(severity_weight(item)) across the domain
+    #   domain_penalty  = min(1.0, weighted_count / inventory_positions)
+    #                     * health_domain_max_penalty
+    #   health_score    = clamp(round(100 - sum(domain_penalty)), 0, 100)
+    #
+    # Normalizing by the number of store/product inventory positions keeps the
+    # score comparable between the whole portfolio and a single store. Every
+    # domain penalty is returned in the response so the score can be explained.
+    health_domain_max_penalty: float = 20.0
+    # Severity weights per operational signal (higher = riskier). Each item
+    # contributes `weight` units toward its domain's weighted count.
+    health_weight_critical: float = 3.0  # stock-out CRITICAL
+    health_weight_high: float = 1.5  # stock-out HIGH
+    health_weight_medium: float = 0.75  # stock-out MEDIUM
+    health_weight_overstock: float = 1.5
+    health_weight_slow_mover: float = 1.5
+    health_weight_forecast_at_risk: float = 3.0
+    health_weight_forecast_watch: float = 1.0
+    health_weight_anomaly_spike: float = 1.0
+    health_weight_anomaly_drop: float = 2.0
+    # Health score -> status bands (inclusive lower bound):
+    #   EXCELLENT >= excellent, HEALTHY >= healthy, WATCH >= watch,
+    #   AT_RISK >= at_risk, otherwise CRITICAL.
+    health_status_excellent: int = 85
+    health_status_healthy: int = 70
+    health_status_watch: int = 55
+    health_status_at_risk: int = 40
+
+    # --- executive summary (Milestone 8) -----------------------------------
+    # Default/maximum size of the top issues/opportunities/declines lists and
+    # the forecast horizon the executive outlook uses for demand signals.
+    executive_default_limit: int = 5
+    executive_max_limit: int = 20
+    executive_forecast_horizon_days: int = 7
+
 
 DEFAULT_CONFIG = AnalyticsConfig()

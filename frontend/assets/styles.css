@@ -1433,3 +1433,192 @@ body {
     forced-color-adjust: none;
   }
 }
+
+/* --- Executive Overview (Milestone 8) -------------------------------------- */
+
+.exec-health-row {
+  display: grid;
+  grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.6fr);
+  gap: 16px;
+}
+
+.exec-health-card,
+.exec-metrics-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-sm);
+}
+
+.exec-health-score {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin: 12px 0 6px;
+}
+
+.exec-health-score strong {
+  font-size: clamp(2.6rem, 6vw, 4rem);
+  font-weight: 800;
+  letter-spacing: -1px;
+  line-height: 1;
+  color: var(--navy);
+}
+
+.exec-status-pill {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  padding: 4px 12px;
+  border-radius: 999px;
+  border: 1px solid transparent;
+}
+
+.status-excellent, .status-healthy { color: #166534; background: var(--ok-soft); border-color: #bbf7d0; }
+.status-watch { color: #92400e; background: var(--slow-soft); border-color: #fde68a; }
+.status-at-risk { color: #c2410c; background: var(--over-soft); border-color: #fed7aa; }
+.status-critical { color: #991b1b; background: var(--risk-soft); border-color: #fecaca; }
+
+.exec-health-explanation {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+.exec-health-details {
+  margin-top: 12px;
+  border-top: 1px dashed var(--border);
+  padding-top: 10px;
+  font-size: 0.85rem;
+}
+
+.exec-health-details summary {
+  cursor: pointer;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.exec-formula {
+  margin: 8px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.5;
+}
+
+.exec-component-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.exec-component {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: 0.8rem;
+  padding: 4px 6px;
+}
+
+.exec-component-label {
+  color: var(--muted);
+}
+
+.exec-component-amount {
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.exec-metrics-card {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  align-content: center;
+  gap: 14px;
+}
+
+.exec-metric {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.exec-metric span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+.exec-metric strong {
+  font-size: 1.35rem;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--navy);
+}
+
+.exec-row {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.exec-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.exec-item {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  padding: 12px 14px;
+}
+
+.exec-item-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.exec-item-type {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.exec-item-title {
+  margin: 0 0 4px;
+  font-size: 0.94rem;
+  font-weight: 700;
+}
+
+.exec-item-text {
+  margin: 0 0 6px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+}
+
+.exec-item-action {
+  margin: 2px 0 0;
+  font-size: 0.8rem;
+  color: var(--text);
+}
+
+@media (max-width: 900px) {
+  .exec-health-row {
+    grid-template-columns: 1fr;
+  }
+
+  .exec-row {
+    grid-template-columns: 1fr;
+  }
+}

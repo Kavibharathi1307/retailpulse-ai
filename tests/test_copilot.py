@@ -30,6 +30,7 @@ from src.gemini.errors import (
 from src.gemini.intents import (
     INTENT_ATTENTION,
     INTENT_DROP,
+    INTENT_EXECUTIVE,
     INTENT_FORECAST,
     INTENT_OVERSTOCK,
     INTENT_PRODUCT,
@@ -99,7 +100,18 @@ class IntentRoutingTest(unittest.TestCase):
 
     def test_attention(self):
         self.assert_intent("What needs my attention today?", INTENT_ATTENTION)
-        self.assert_intent("what should I focus on today", INTENT_ATTENTION)
+        self.assert_intent("Which areas need attention?", INTENT_ATTENTION)
+        self.assert_intent("show me the highlighted issues", INTENT_ATTENTION)
+
+    def test_executive(self):
+        self.assert_intent("How healthy is the business?", INTENT_EXECUTIVE)
+        self.assert_intent("What are the biggest problems?", INTENT_EXECUTIVE)
+        self.assert_intent("Give me an executive summary.", INTENT_EXECUTIVE)
+        self.assert_intent("What should I focus on?", INTENT_EXECUTIVE)
+        self.assert_intent("Which products are declining?", INTENT_EXECUTIVE)
+        self.assert_intent("Show me the top opportunities and declines.", INTENT_EXECUTIVE)
+        self.assert_intent("What is the retail health score?", INTENT_EXECUTIVE)
+        self.assert_intent("where should I take action first", INTENT_EXECUTIVE)
 
     def test_product_performance(self):
         routed = classify_intent("How is product 7 performing?")
@@ -192,6 +204,52 @@ class ServiceWithGeminiTest(unittest.TestCase):
         types = [e["type"] for e in result["evidence"]]
         self.assertIn("ATTENTION_SUMMARY", types)
         self.assertIn("STOCK_OUT_RISK", types)
+
+    def test_executive_question_grounded(self):
+        fake = FakeClient("The business is in WATCH territory at 66/100.")
+        result = service_with(fake).answer("How healthy is the business?")
+        self.assertEqual(result["intent"], INTENT_EXECUTIVE)
+        self.assertTrue(result["grounded"])
+        self.assertEqual(result["ai_status"], "AVAILABLE")
+        self.assertEqual(result["data_status"], "SUFFICIENT")
+        self.assertEqual(result["analysis_date"], "2026-01-31")
+        types = [e["type"] for e in result["evidence"]]
+        self.assertIn("EXECUTIVE_SUMMARY", types)
+        self.assertIn("EXECUTIVE_ISSUE", types)
+
+    def test_executive_bundles_deterministic_evidence(self):
+        fake = FakeClient("ok")
+        result = service_with(fake).answer("What are the biggest problems?")
+        self.assertEqual(result["intent"], INTENT_EXECUTIVE)
+        summary = next(e for e in result["evidence"] if e["type"] == "EXECUTIVE_SUMMARY")
+        value = summary["value"]
+        self.assertEqual(value["health_score"], result["evidence"][0]["value"]["health_score"])
+        self.assertIn(value["health_status"], {"EXCELLENT", "HEALTHY", "WATCH", "AT_RISK", "CRITICAL"})
+        self.assertEqual(value["total_stores"], 5)
+        self.assertEqual(value["critical_issue_count"], 15)
+        self.assertEqual(value["stockout_risk_count"], 50)
+        issues = [e for e in result["evidence"] if e["type"] == "EXECUTIVE_ISSUE"]
+        self.assertTrue(issues)
+        self.assertTrue(all(e["category"] == "FACT" for e in issues))
+        opps = [e for e in result["evidence"] if e["type"] == "EXECUTIVE_OPPORTUNITY"]
+        decs = [e for e in result["evidence"] if e["type"] == "EXECUTIVE_DECLINE"]
+        self.assertTrue(all(e["category"] == "ESTIMATE" for e in opps + decs))
+
+    def test_executive_question_supports_store_filter(self):
+        fake = FakeClient("ok")
+        result = service_with(fake).answer("How healthy is store 2?")
+        self.assertEqual(result["intent"], INTENT_EXECUTIVE)
+        self.assertEqual(result["evidence"][0]["value"]["total_stores"], 1)
+        self.assertEqual(result["analysis_date"], "2026-01-31")
+
+    def test_executive_fallback_summary_is_deterministic(self):
+        fake = FakeClient(None, exc=GeminiTimeoutError("boom"))
+        result = service_with(fake).answer("Give me an executive summary.")
+        self.assertEqual(result["intent"], INTENT_EXECUTIVE)
+        self.assertEqual(result["ai_status"], "UNAVAILABLE")
+        self.assertFalse(result["grounded"])
+        self.assertIn("Retail health:", result["answer"])
+        self.assertIn("66", result["answer"])
 
     def test_unsupported_question_skips_gemini(self):
         fake = FakeClient()
