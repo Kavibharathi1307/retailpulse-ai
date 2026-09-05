@@ -118,11 +118,45 @@
 
         <aside class="panel copilot-panel" aria-label="Copilot">
           <h2 class="panel-title">Copilot</h2>
-          <div class="chat-area">
-            <p class="placeholder-body">
-              Ask questions about your sales and inventory here in a future
-              milestone.
-            </p>
+          <div class="copilot-suggestions" id="copilot-suggestions" aria-label="Example questions">
+            <button type="button" class="suggestion-chip" data-question="What needs my attention today?">
+              What needs my attention?
+            </button>
+            <button type="button" class="suggestion-chip" data-question="Which products are at risk of stock-out?">
+              Stock-out risks
+            </button>
+            <button type="button" class="suggestion-chip" data-question="What is overstocked?">
+              Overstock
+            </button>
+            <button type="button" class="suggestion-chip" data-question="Which products had a sales drop?">
+              Sales drops
+            </button>
+          </div>
+          <form class="copilot-form" id="copilot-form">
+            <input
+              type="text"
+              id="copilot-question"
+              class="copilot-input"
+              placeholder="Ask a question about your sales and inventory&hellip;"
+              maxlength="500"
+              autocomplete="off"
+            />
+            <button type="submit" id="copilot-ask" class="copilot-ask">Ask</button>
+          </form>
+          <div class="copilot-status" id="copilot-status" aria-live="polite">
+            Ready. Answers are grounded in the deterministic analytics engine.
+          </div>
+          <div class="copilot-result" id="copilot-result" hidden>
+            <div class="copilot-meta" id="copilot-meta"></div>
+            <div class="copilot-answer" id="copilot-answer"></div>
+            <div class="copilot-section">
+              <h4>Evidence used</h4>
+              <ul class="copilot-evidence" id="copilot-evidence"></ul>
+            </div>
+            <div class="copilot-section">
+              <h4>Assumptions</h4>
+              <ul class="copilot-assumptions" id="copilot-assumptions"></ul>
+            </div>
           </div>
         </aside>
 

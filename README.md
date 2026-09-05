@@ -12,7 +12,7 @@ questions and surfacing what needs attention.
 
 ## Current Status
 
-Current milestone: **Milestone 3 — Deterministic Retail Analytics Engine**.
+Current milestone: **Milestone 4 — Gemini Grounded Copilot**.
 
 Implemented:
 
@@ -27,11 +27,15 @@ Implemented:
   spike/drop detection, product and store performance, plus a severity-sorted
   attention summary with explicit evidence for every finding.
 - Analytics API endpoints under `/api/analytics`.
-- Automated analytics unit tests and HTTP-level API verification.
+- A **grounded natural-language copilot** (`src/gemini/` + `/api/copilot/query`)
+  that answers retail questions with Google Gemini, where Gemini may only use
+  evidence produced by the deterministic analytics engine.
+- Automated analytics unit tests and HTTP-level API verification plus a fully
+  mocked M4 test suite (no API key required to run the tests).
 
-Not implemented yet (later milestones):
+Not implemented yet (future milestones):
 
-- Gemini chat, intent extraction, embeddings, and RAG / evidence retrieval.
+- Embeddings and RAG / vector-database evidence retrieval.
 - The final analytics + copilot dashboard.
 
 The analytics layer derives every conclusion from the raw numbers — no
@@ -189,6 +193,76 @@ source a future copilot will summarize.
 **Thresholds.** All thresholds live in one frozen `AnalyticsConfig`
 (`src/analytics/config.py`) and can be tuned in a single place.
 
+## Gemini Grounded Copilot (Milestone 4)
+
+Users can now ask natural-language retail questions ("What needs my
+attention today?", "Which products are at risk of stock-out?") through the
+Copilot panel in the frontend or directly via `POST /api/copilot/query`.
+The answer is **grounded**: Gemini may only use evidence supplied by the
+deterministic analytics engine, never external knowledge.
+
+**Architecture — evidence first, language second.**
+
+1. **Deterministic intent classification** (`src/gemini/intents.py`) routes the
+   question to one supported retail intent using keyword rules. No model call is
+   involved, and off-topic questions are detected before anything else.
+2. **Evidence retrieval** (`src/gemini/evidence.py`) runs the relevant analytics
+   engine operation (stock-out risk, overstock, slow movers, spikes/drops,
+   product/store performance, attention summary) and returns the top records
+   with their raw numbers — this is the only source of facts.
+3. **Grounded prompting** (`src/gemini/prompts.py`) sends the evidence as a
+   JSON block to Gemini. The system instruction is the hallucination barrier:
+   Gemini may use **only** the supplied evidence, must ignore any numbers or
+   product claims that appear only in the question, must never invent data, and
+   must treat `FACT` vs `ESTIMATE` distinctions strictly.
+4. **Deterministic fallback** (`src/gemini/service.py`): if the evidence is
+   empty, unsupported questions are never sent to Gemini, and if the API key is
+   missing or any Gemini call fails, the service returns an engine-only
+   summary (grounded answer, `ai_status` explains why).
+
+**Supported question intents.** `stockout`, `reorder`, `overstock`,
+`slow_movers`, `spike`, `drop`, `product_performance`, `store_performance`,
+`attention`, and `unsupported` (gracefully refused where the data cannot
+answer or the topic is outside the retail data).
+
+**Response shape** (for every question):
+
+```json
+{
+  "question": "...",
+  "answer": "...",
+  "intent": "stockout",
+  "analysis_date": "2026-01-31",
+  "data_status": "SUFFICIENT",
+  "evidence": [ { "type": "STOCK_OUT_RISK", "category": "FACT", "severity": "CRITICAL",
+                  "store_name": "...", "product_name": "...", "metric": "days_of_stock",
+                  "value": 2.2, "threshold": "CRITICAL<=7 days", "analysis_date": "2026-01-31" } ],
+  "assumptions": [ "...", "..." ],
+  "grounded": true,
+  "ai_status": "AVAILABLE",
+  "model": "gemini-2.5-flash"
+}
+```
+
+`data_status` is `SUFFICIENT`, `INSUFFICIENT_DATA`, or `UNSUPPORTED`.
+`ai_status` is `AVAILABLE`, `NOT_CONFIGURED`, `UNAVAILABLE`, or `SKIPPED`.
+
+**Safety and safeguards.**
+
+- The Gemini API key is read only from the `GEMINI_API_KEY` environment
+  variable and is **never** exposed to the frontend, in API responses, in
+  logs, or in the codebase. The app starts fine without the key.
+- Off-topic and unsupported questions never reach Gemini.
+- Empty deterministic evidence means the answer explicitly says the data
+  cannot determine it — Gemini is skipped.
+- The question is capped at 500 characters; empty or over-length questions are
+  rejected at the API (`400`/`422`).
+- User questions are treated as **untrusted text**: the evidence block is built
+  only from the analytics engine (numbers or products mentioned only in the
+  question cannot enter the evidence), and Gemini's output is rendered in the
+  frontend as plain text, so no HTML/script injection is possible.
+- No `eval`, `exec`, or dynamic code execution anywhere in the pipeline.
+
 ## API Endpoints
 
 | Endpoint                     | Description                                            |
@@ -206,20 +280,25 @@ source a future copilot will summarize.
 | `GET /api/analytics/sales-anomalies` | Sales spikes/drops. Filters: `store_id`, `product_id`, `as_of_date`, `start_date`, `end_date`. |
 | `GET /api/analytics/product-performance` | Per-product performance. Filters: `product_id`, `as_of_date`, `start_date`, `end_date`. |
 | `GET /api/analytics/store-performance`   | Per-store performance. Filters: `store_id`, `as_of_date`, `start_date`, `end_date`. |
+| `POST /api/copilot/query` | Natural-language retail query. Body: `{ "question": "..." }`. Returns the grounded answer, intent, evidence, assumptions, data status, and AI status. |
 
 Data endpoints return `{items, total, limit, offset}`. Analytics list endpoints
 return the same envelope alongside `analysis_date` (and the relevant window
 boundaries). Every analytics row includes `analysis_date`, `store_id` /
 `product_id` (with names), `explanation`, `evidence`, and `data_status`.
+The copilot endpoint always returns HTTP `200` for answered or gracefully
+refused questions; invalid requests return `400`/`422`.
 Invalid parameters return useful HTTP errors (`400`, `404`, `422`) with
 structured JSON messages; database failures return `503`. No stack traces or
 secrets are exposed.
 
 ## Environment Variables
 
-| Variable         | Required | Description                                                                            |
-| ---------------- | -------- | -------------------------------------------------------------------------------------- |
-| `GEMINI_API_KEY` | No       | Gemini API key (used by future LLM features). The app starts fine without it.          |
+| Variable                    | Required | Description                                                                                 |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------- |
+| `GEMINI_API_KEY`            | No       | Gemini API key for the grounded copilot. The app and all tests work fine without it.        |
+| `GEMINI_MODEL`              | No       | Gemini model id. Default: `gemini-2.5-flash`.                                               |
+| `GEMINI_MAX_OUTPUT_TOKENS`  | No       | Max tokens for copilot answers. Default: `800`.                                             |
 
 Read the key only from the `GEMINI_API_KEY` environment variable. Never commit
 a real API key to the repository.
@@ -240,11 +319,17 @@ a real API key to the repository.
   (`performance.py`, `stock.py`, `velocity.py`, `anomalies.py`,
   `attention.py`) orchestrated by `engine.py` and exposed by
   `src/analytics_api.py`. Calculation modules never touch the database; SQL
-  lives only in `data.py`. The `attention` module emits the evidence a future
-  AI layer will use.
-- **Gemini integration (planned)** — Future LLM calls and embeddings
-  (`gemini-embedding-001`) for evidence-grounded answers. The analytics engine
-  is explicitly kept independent of LLM reasoning.
+  lives only in `data.py`. The `attention` module emits the evidence the
+  copilot relies on.
+- **Grounded copilot** — `src/gemini/` holds the no-AI routing glue:
+  `intents.py` (deterministic keyword classification), `evidence.py` (runs the
+  analytics engine and builds the fact block independent of Gemini),
+  `config.py` + `client.py` (google-genai SDK wrapper with timeouts and error
+  mapping), `prompts.py` (grounding system instruction and prompt assembly),
+  and `service.py` (orchestration plus the deterministic fallback). It is
+  exposed by `src/copilot_api.py` and consumes the engine via
+  `src/analytics/engine.py` only. No embeddings or vector store are used in
+  this milestone.
 
 ## Testing
 
@@ -258,16 +343,36 @@ Run the server with `python app.py`, then check:
 - `/api/analytics/*` endpoints return `analysis_date`, the envelope, and rows
   with `evidence` and `explanation`.
 
-Automated verification (all deterministic, no network needed):
+Automated verification (all deterministic, no network needed — the copilot
+tests use a mocked Gemini client):
 
 ```bash
 python data/verify_data.py            # data-quality checks against the dataset
 python tests/verify_api.py            # HTTP-level checks of the data endpoints
 python -m unittest tests.test_analytics -v   # analytics engine unit tests
 python tests/verify_analytics_api.py  # HTTP-level checks of the analytics APIs
+python -m unittest tests.test_copilot -v     # copilot unit tests (mocked Gemini)
+python tests/verify_copilot_api.py    # HTTP-level checks of the copilot + frontend
 ```
 
 The unit tests build a tiny synthetic retail database with controlled patterns
 (zero-sales product, slow mover, overstock, a spike, a drop, short history) and
 assert the exact statuses, numbers, and `INSUFFICIENT_DATA` behavior the engine
-must produce.
+must produce. The copilot tests additionally verify intent routing,
+evidence-based grounding, the no-fabrication contract, every Gemini failure
+mode's fallback, and the security checks (key never in frontend/responses, no
+`eval`/`exec`, Gemini output rendered as untrusted text).
+
+**Using the copilot.** Ask questions in the Copilot panel (suggestion chips are
+provided) or call:
+
+```bash
+curl -X POST http://localhost:8000/api/copilot/query \
+  -H "Content-Type: application/json" \
+  -d '{"question": "Which products are at risk of stock-out?"}'
+```
+
+If `GEMINI_API_KEY` is set, answers are phrased by Gemini but constrained to
+the engine's evidence. Without a key (or on any Gemini failure) the endpoint
+still answers with a deterministic engine-only summary so the app never stalls
+or hallucinates.

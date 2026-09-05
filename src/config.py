@@ -30,3 +30,24 @@ def get_gemini_api_key() -> str | None:
 def gemini_configured() -> bool:
     """True when a Gemini API key is available for future LLM features."""
     return get_gemini_api_key() is not None
+
+
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
+
+def get_gemini_model() -> str:
+    """Return the configured Gemini model name (GEMINI_MODEL env override)."""
+    return get_env("GEMINI_MODEL") or DEFAULT_GEMINI_MODEL
+
+
+DEFAULT_GEMINI_MAX_OUTPUT_TOKENS = 800
+
+
+def get_gemini_max_output_tokens() -> int:
+    """Return the configured max output tokens for Gemini responses."""
+    value = get_env("GEMINI_MAX_OUTPUT_TOKENS")
+    try:
+        parsed = int(value) if value is not None else 0
+    except ValueError:
+        parsed = 0
+    return parsed if parsed > 0 else DEFAULT_GEMINI_MAX_OUTPUT_TOKENS
