@@ -85,6 +85,41 @@ async function refreshSalesPreview() {
   }
 }
 
+async function refreshAnalyticsStatus() {
+  const targets = {
+    stockout: document.getElementById("analytics-stockout"),
+    overstock: document.getElementById("analytics-overstock"),
+    slow: document.getElementById("analytics-slow"),
+    anomalies: document.getElementById("analytics-anomalies"),
+  };
+
+  try {
+    const response = await fetch("/api/analytics/attention-summary?limit=1");
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}`);
+    }
+    const data = await response.json();
+    const counts = data.counts;
+    targets.stockout.textContent = formatNumber(counts.stock_out_risks);
+    targets.overstock.textContent = formatNumber(counts.overstock);
+    targets.slow.textContent = formatNumber(counts.slow_movers);
+    targets.anomalies.textContent = formatNumber(
+      counts.sales_spikes + counts.sales_drops,
+    );
+
+    const rangeElement = document.getElementById("analytics-range");
+    rangeElement.textContent = data.analysis_date
+      ? `Deterministic insights computed as of ${data.analysis_date} (no AI used).`
+      : "Analytics unavailable.";
+  } catch (err) {
+    Object.values(targets).forEach((el) => {
+      el.textContent = "unavailable";
+    });
+    document.getElementById("analytics-range").textContent =
+      "Analytics engine unreachable.";
+  }
+}
+
 function escapeHtml(value) {
   return String(value)
     .replaceAll("&", "&amp;")
@@ -95,3 +130,4 @@ function escapeHtml(value) {
 
 refreshEngineStatus();
 refreshDataStatus();
+refreshAnalyticsStatus();

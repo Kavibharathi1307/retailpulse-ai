@@ -15,6 +15,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from src.analytics_api import router as analytics_router
 from src.api import router as data_router
 from src.config import FRONTEND_DIR, get_gemini_api_key
 from src.database import ensure_database
@@ -29,11 +30,12 @@ async def lifespan(_: FastAPI):
 app = FastAPI(
     title="RetailPulse AI",
     description="Retail Sales & Inventory Copilot (PS03)",
-    version="0.2.0",
+    version="0.3.0",
     lifespan=lifespan,
 )
 
 app.include_router(data_router)
+app.include_router(analytics_router)
 
 
 @app.get("/api/health")

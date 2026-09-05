@@ -1,0 +1,333 @@
+"""Analytics API endpoints (Milestone 3).
+
+Deterministic, rule-based insights exposed under /api/analytics. Every response
+carries the analysis_date and the evidence behind each finding so a future AI
+layer can ground its answers in these numbers.
+"""
+
+import sqlite3
+from datetime import date
+from typing import Optional
+
+from fastapi import APIRouter, HTTPException, Query
+
+from src import repositories
+from src.analytics import data as analytics_data
+from src.analytics import engine as analytics_engine
+from src.analytics.config import DEFAULT_CONFIG
+from src.config import DATABASE_PATH
+
+router = APIRouter(prefix="/api/analytics", tags=["analytics"])
+
+DEFAULT_LIMIT = 100
+MAX_LIMIT = 1000
+
+
+def _bounded_limit(limit: int) -> int:
+    if limit < 0 or limit > MAX_LIMIT:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_limit",
+                "message": f"limit must be between 0 and {MAX_LIMIT}",
+            },
+        )
+    return limit
+
+
+def _offset(offset: int) -> int:
+    if offset < 0:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_offset", "message": "offset must be >= 0"},
+        )
+    return offset
+
+
+def _require_resource(exists: bool, resource: str, resource_id: int) -> None:
+    if not exists:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": "not_found",
+                "message": f"{resource} {resource_id} does not exist",
+            },
+        )
+
+
+def _validate_references(store_id=None, product_id=None) -> None:
+    if store_id is not None and not repositories.store_exists(store_id=store_id):
+        _require_resource(False, "store", store_id)
+    if product_id is not None and not repositories.product_exists(product_id=product_id):
+        _require_resource(False, "product", product_id)
+
+
+def _validate_analysis_date(as_of_date: Optional[date]) -> Optional[date]:
+    """Reject as_of_date outside the committed dataset's date range."""
+    if as_of_date is None:
+        return None
+    bounds = analytics_data.dataset_date_range(DATABASE_PATH)
+    if bounds is None:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "no_sales_data",
+                "message": "The retail database has no sales history to analyse.",
+            },
+        )
+    first, last = bounds
+    if not (first <= as_of_date <= last):
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "error": "invalid_as_of_date",
+                "message": (
+                    f"as_of_date must be within the dataset range "
+                    f"{first.isoformat()}..{last.isoformat()}"
+                ),
+            },
+        )
+    return as_of_date
+
+
+def _validate_period(start_date: Optional[date], end_date: Optional[date]) -> None:
+    if start_date is not None and end_date is not None and start_date > end_date:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": "invalid_range", "message": "start_date must not be after end_date"},
+        )
+
+
+def _run(operation) -> dict:
+    try:
+        return operation()
+    except HTTPException:
+        raise
+    except sqlite3.Error as exc:
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error": "database_unavailable",
+                "message": "The retail database is currently unavailable.",
+            },
+        ) from exc
+
+
+def _page(items: list, limit: int, offset: int) -> dict:
+    total = len(items)
+    return {"items": items[offset : offset + limit], "total": total, "limit": limit, "offset": offset}
+
+
+@router.get("/attention-summary")
+def attention_summary(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    summary = _run(
+        lambda: analytics_engine.attention_summary(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": summary["analysis_date"],
+        "counts": summary["counts"],
+        **_page(summary["items"], limit, offset),
+    }
+
+
+@router.get("/stock-out-risks")
+def stock_out_risks(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    result = _run(
+        lambda: analytics_engine.stockout_risks(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/overstock")
+def overstock(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    result = _run(
+        lambda: analytics_engine.overstock(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/slow-movers")
+def slow_movers(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_references(store_id, product_id)
+    result = _run(
+        lambda: analytics_engine.slow_movers(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/sales-anomalies")
+def sales_anomalies(
+    store_id: Optional[int] = Query(None),
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_period(start_date, end_date)
+    _validate_references(store_id, product_id)
+    result = _run(
+        lambda: analytics_engine.sales_anomalies(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            start_date=start_date,
+            end_date=end_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "scan_window_start": result["scan_window_start"],
+        "scan_window_end": result["scan_window_end"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/product-performance")
+def product_performance(
+    product_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_period(start_date, end_date)
+    if product_id is not None and not repositories.product_exists(product_id=product_id):
+        _require_resource(False, "product", product_id)
+    result = _run(
+        lambda: analytics_engine.product_performance(
+            db_path=DATABASE_PATH,
+            product_id=product_id,
+            as_of_date=as_of_date,
+            start_date=start_date,
+            end_date=end_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        **_page(result["items"], limit, offset),
+    }
+
+
+@router.get("/store-performance")
+def store_performance(
+    store_id: Optional[int] = Query(None),
+    as_of_date: Optional[date] = Query(None),
+    start_date: Optional[date] = Query(None),
+    end_date: Optional[date] = Query(None),
+    limit: int = Query(DEFAULT_LIMIT),
+    offset: int = Query(0),
+) -> dict:
+    limit = _bounded_limit(limit)
+    offset = _offset(offset)
+    as_of_date = _validate_analysis_date(as_of_date)
+    _validate_period(start_date, end_date)
+    if store_id is not None and not repositories.store_exists(store_id=store_id):
+        _require_resource(False, "store", store_id)
+    result = _run(
+        lambda: analytics_engine.store_performance(
+            db_path=DATABASE_PATH,
+            store_id=store_id,
+            as_of_date=as_of_date,
+            start_date=start_date,
+            end_date=end_date,
+            config=DEFAULT_CONFIG,
+        )
+    )
+    return {
+        "analysis_date": result["analysis_date"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        **_page(result["items"], limit, offset),
+    }

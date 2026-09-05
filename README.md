@@ -12,7 +12,7 @@ questions and surfacing what needs attention.
 
 ## Current Status
 
-Current milestone: **Milestone 2 — Retail Data Layer**.
+Current milestone: **Milestone 3 — Deterministic Retail Analytics Engine**.
 
 Implemented:
 
@@ -22,21 +22,24 @@ Implemented:
 - A **local SQLite retail data layer** (`data/retailpulse.db`) with realistic,
   deterministic sample data for stores, products, daily sales, and inventory.
 - JSON API endpoints to read stores, products, sales, and inventory.
-- Deterministic data-generation and data-quality verification scripts.
+- A **deterministic analytics engine** (`src/analytics/`) with **no AI**: pure,
+  rule-based stock-out risk, overstock and slow-mover detection, sales
+  spike/drop detection, product and store performance, plus a severity-sorted
+  attention summary with explicit evidence for every finding.
+- Analytics API endpoints under `/api/analytics`.
+- Automated analytics unit tests and HTTP-level API verification.
 
 Not implemented yet (later milestones):
 
 - Gemini chat, intent extraction, embeddings, and RAG / evidence retrieval.
-- Stock-out prediction, reorder / overstock / slow-mover detection.
-- Sales anomalies, product performance, and store performance analytics.
 - The final analytics + copilot dashboard.
 
-The analytics layer in a later milestone MUST derive every conclusion from the
-raw data — no analytical labels are stored in the database. The dataset
-intentionally contains raw patterns (fast/slow movers, a seasonal product, a
-declining product, a short sale spike, a short sale drop, thin stock on some
-fast movers, high stock on some slow movers) that later milestones will need to
-*discover* from the numbers.
+The analytics layer derives every conclusion from the raw numbers — no
+analytical labels are stored in the database. The dataset intentionally
+contains raw patterns (fast/slow movers, a seasonal product, a declining
+product, a short sale spike, a short sale drop, thin stock on some fast
+movers, high stock on some slow movers) that the engine *discovers* from the
+data.
 
 ## How to Run
 
@@ -123,6 +126,69 @@ non-negative and reference real stores and products.
 On startup the application verifies the database; if it is ever missing or
 unpopulated it is regenerated deterministically automatically.
 
+## Deterministic Analytics Engine (Milestone 3)
+
+The engine in `src/analytics/` is **pure and deterministic**: identical inputs
+always produce identical outputs, and no AI/Gemini call is made anywhere in it.
+Every insight is derived from documented formulas and carries an `evidence`
+block (the raw numbers that produced it) plus an `explanation` in plain text —
+this is what a future AI layer will rely on for grounded answers.
+
+**Analysis date.** By default every endpoint is evaluated **as of the latest
+sale date in the dataset** (`2026-01-31`), never the real-world calendar date.
+The chosen date is echoed back as `analysis_date` in every response. An
+`as_of_date` outside the dataset range is rejected with `400`.
+
+**Windows (configured in `src/analytics/config.py`).**
+
+| Window | Days | Used for |
+| ------ | ---: | -------- |
+| Demand window | 28 | Stock-out risk, overstock, slow movers |
+| Performance period | 28 | Product / store performance vs previous period |
+| Anomaly scan | 90 | Sales spike / drop detection |
+| Anomaly recent | 7 | The window compared against the baseline |
+| Anomaly baseline | 28 | Window immediately before the recent window |
+
+**Formulas and rules.**
+
+- `average_daily_sales = units in demand window / demand window days`.
+- **Stock-out risk**: `days_of_stock = current_stock / average_daily_sales`
+  with status `CRITICAL` (≤ 7 days), `HIGH` (≤ 14), `MEDIUM` (≤ 30),
+  else `LOW`. `estimated_stock_out_date` is only emitted when demand exists.
+- **Overstock**: `stock_cover_days = current_stock / average_daily_sales`;
+  `OVERSTOCK` when cover ≥ 60 days.
+- **Slow movers**: `SLOW_MOVER` when `average_daily_sales` ≤ 0.5 units/day
+  **and** the product sold on ≥ 5 distinct days in the window (avoids
+  false positives from thin history).
+- **Sales anomalies**: a rolling scan compares the recent 7-day daily rate with
+  the preceding 28-day baseline rate:
+  `change_pct = (recent_daily_rate − baseline_daily_rate) / baseline_daily_rate × 100`.
+  `SPIKE` when `change_pct ≥ +100%`; `DROP` when `change_pct ≤ −50%`. Volume
+  safeguards: the baseline window must total ≥ 30 units and the absolute change
+  must be ≥ 10 units. The strongest qualifying event per store/product is
+  reported.
+- **Performance**: units, revenue, averages, period-over-period change `%`, and
+  a first-half vs second-half **trend** (`UP` / `DOWN` / `STABLE`). The engine
+  reports measurements; it never invents advice.
+
+**Honest unknowns.** When there is not enough history or no observed demand the
+engine returns `data_status: "INSUFFICIENT_DATA"` (or `UNKNOWN` for stock-out
+risk) and **does not fabricate** a stock-out date, a trend, or an anomaly
+label. A product with zero sales is never called a slow mover just because it
+did not sell.
+
+**No profitability claims.** The schema stores no cost/profit/margin fields, so
+the engine reports units and revenue only and never computes or asserts
+profitability.
+
+**Attention summary.** Aggregates the riskiest findings — stock-out risks
+(CRITICAL and HIGH only), overstock, slow movers, sales spikes and drops — into
+one severity-sorted list with counts. This summary is the single evidence
+source a future copilot will summarize.
+
+**Thresholds.** All thresholds live in one frozen `AnalyticsConfig`
+(`src/analytics/config.py`) and can be tuned in a single place.
+
 ## API Endpoints
 
 | Endpoint                     | Description                                            |
@@ -133,11 +199,21 @@ unpopulated it is regenerated deterministically automatically.
 | `GET /api/sales`             | List sales. Filters: `store_id`, `product_id`, `start_date`, `end_date`. |
 | `GET /api/inventory`         | List inventory. Filters: `store_id`, `product_id`.     |
 | `GET /api/data/summary`      | Record counts for stores, products, sales, inventory.  |
+| `GET /api/analytics/attention-summary` | Severity-sorted attention list with counts. Filters: `store_id`, `product_id`, `as_of_date`. |
+| `GET /api/analytics/stock-out-risks` | Stock-out risk per store/product. Filters: `store_id`, `product_id`, `as_of_date`. |
+| `GET /api/analytics/overstock`       | Overstock detection. Filters: `store_id`, `product_id`, `as_of_date`. |
+| `GET /api/analytics/slow-movers`     | Slow-mover detection. Filters: `store_id`, `product_id`, `as_of_date`. |
+| `GET /api/analytics/sales-anomalies` | Sales spikes/drops. Filters: `store_id`, `product_id`, `as_of_date`, `start_date`, `end_date`. |
+| `GET /api/analytics/product-performance` | Per-product performance. Filters: `product_id`, `as_of_date`, `start_date`, `end_date`. |
+| `GET /api/analytics/store-performance`   | Per-store performance. Filters: `store_id`, `as_of_date`, `start_date`, `end_date`. |
 
-List endpoints support `limit` and `offset` pagination and return
-`{items, total, limit, offset}`. Invalid parameters return useful HTTP errors
-(`400`, `404`, `422`) with structured JSON messages; database failures return
-`503`. No stack traces or secrets are exposed.
+Data endpoints return `{items, total, limit, offset}`. Analytics list endpoints
+return the same envelope alongside `analysis_date` (and the relevant window
+boundaries). Every analytics row includes `analysis_date`, `store_id` /
+`product_id` (with names), `explanation`, `evidence`, and `data_status`.
+Invalid parameters return useful HTTP errors (`400`, `404`, `422`) with
+structured JSON messages; database failures return `503`. No stack traces or
+secrets are exposed.
 
 ## Environment Variables
 
@@ -158,22 +234,40 @@ a real API key to the repository.
 - **Data layer** — `src/schema.py` (schema), `src/database.py` (SQLite
   connections and startup bootstrap), `src/repositories.py` (data access),
   `src/datavalidation.py` (basic validation). Raw data lives under `data/`.
+- **Analytics engine** — `src/analytics/` is a pure, deterministic, no-AI layer
+  split into `config.py` (all thresholds), `data.py` (all SQL reads),
+  `metrics.py` (shared numeric helpers), and one module per category
+  (`performance.py`, `stock.py`, `velocity.py`, `anomalies.py`,
+  `attention.py`) orchestrated by `engine.py` and exposed by
+  `src/analytics_api.py`. Calculation modules never touch the database; SQL
+  lives only in `data.py`. The `attention` module emits the evidence a future
+  AI layer will use.
 - **Gemini integration (planned)** — Future LLM calls and embeddings
-  (`gemini-embedding-001`) for evidence-grounded answers.
-- **Deterministic analytics (planned)** — Rule/statistics-based sales and
-  inventory analytics, kept separate from LLM reasoning.
+  (`gemini-embedding-001`) for evidence-grounded answers. The analytics engine
+  is explicitly kept independent of LLM reasoning.
 
 ## Testing
 
 Run the server with `python app.py`, then check:
 
 - `GET http://localhost:8000/api/health` returns a JSON `status: "ok"`.
-- `http://localhost:8000` loads the frontend and shows retail data counts.
+- `http://localhost:8000` loads the frontend and shows retail data counts plus
+  the analytics attention summary (analysis date and stock-out / overstock /
+  slow-mover / anomaly counts).
 - Store, product, sales, and inventory endpoints return structured JSON.
+- `/api/analytics/*` endpoints return `analysis_date`, the envelope, and rows
+  with `evidence` and `explanation`.
 
-Automated verification:
+Automated verification (all deterministic, no network needed):
 
 ```bash
-python data/verify_data.py      # data-quality checks against the dataset
-python tests/verify_api.py      # HTTP-level checks of every API endpoint
+python data/verify_data.py            # data-quality checks against the dataset
+python tests/verify_api.py            # HTTP-level checks of the data endpoints
+python -m unittest tests.test_analytics -v   # analytics engine unit tests
+python tests/verify_analytics_api.py  # HTTP-level checks of the analytics APIs
 ```
+
+The unit tests build a tiny synthetic retail database with controlled patterns
+(zero-sales product, slow mover, overstock, a spike, a drop, short history) and
+assert the exact statuses, numbers, and `INSUFFICIENT_DATA` behavior the engine
+must produce.
